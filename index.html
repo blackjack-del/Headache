@@ -183,7 +183,7 @@
                 <option value="">-- เลือกชื่อเดิมในระบบ --</option>
             </select>
             <div class="divider">หรือพิมพ์ชื่อใหม่</div>
-            <input type="text" id="newUserName" placeholder="ใส่ชื่อของคุณ เช่น สมชาย">
+            <input type="text" id="newUserName" placeholder="ใส่ชื่อของคุณ เช่น กิตติ">
             <button type="button" class="btn-local" onclick="handleLoginClick()">เข้าสู่ระบบ</button>
             
             <div class="divider">ตัวเลือกเสริม</div>
@@ -222,7 +222,7 @@
                         </div>
 
                         <div class="form-row">
-                            <label>อาการนำมาก่อน</label>
+                            <label>อาการนำมาก่อน (Aura)</label>
                             <div class="options-group">
                                 <label class="option-label"><input type="checkbox" name="aura" value="เห็นแสง"> เห็นแสง</label>
                                 <label class="option-label"><input type="checkbox" name="aura" value="มีอาการอื่น"> มีอาการอื่น</label>
@@ -232,9 +232,9 @@
                         <div class="form-row">
                             <label>ตำแหน่งที่ปวด</label>
                             <div class="options-group">
-                                <label class="option-label"><input type="radio" name="loc" value="ซ้าย"> ซ้าย</label>
-                                <label class="option-label"><input type="radio" name="loc" value="ขวา"> ขวา</label>
-                                <label class="option-label"><input type="radio" name="loc" value="ทั้ง 2 ข้าง"> ทั้ง 2 ข้าง</label>
+                                <label class="option-label"><input type="checkbox" name="loc" value="ซ้าย"> ซ้าย</label>
+                                <label class="option-label"><input type="checkbox" name="loc" value="ขวา"> ขวา</label>
+                                <label class="option-label"><input type="checkbox" name="loc" value="ทั้ง 2 ข้าง"> ทั้ง 2 ข้าง</label>
                             </div>
                         </div>
 
@@ -363,10 +363,8 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" crossorigin="anonymous"></script>
     <script>
     // ข้อควรระวัง: ตรวจสอบให้แน่ใจว่าเป็นเครื่องหมาย double-quote ปกติ (") ห้ามเป็นเครื่องหมายโค้ง (“ ”)
-// === 1. ตรวจสอบค่าคอนฟิก Supabase ===
-    const SUPABASE_URL = "https://zglonauqilgzbukygzwi.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpnbG9uYXVxaWxnemJ1a3lnendpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyMzA1MjgsImV4cCI6MjEwODgwNjUyOH0.vGCmTsz3lb42W0hXfZITSMhvwPw8JlbiPL9W2YCuu94";
-
+    var SUPABASE_URL = "https://zglonauqilgzbukygzwi.supabase.co";
+    var SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpnbG9uYXVxaWxnemJ1a3lnendpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyMzA1MjgsImV4cCI6MjEwODgwNjUyOH0.vGCmTsz3lb42W0hXfZITSMhvwPw8JlbiPL9W2YCuu94";
 
     window.supabaseClient = null;
 
