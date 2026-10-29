@@ -32,7 +32,6 @@
         
         body { background: var(--bg); margin: 0; padding: 0; }
         
-        /* Layout: มือถือกว้างพอดีจอ / คอมพิวเตอร์ขยายเต็มจอ */
         .container { 
             max-width: 800px; 
             margin: 0 auto; 
@@ -59,13 +58,12 @@
         
         .btn-google { width: 100%; background: #fff; color: #333; border: 1px solid #ccc; padding: 12px; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; }
 
-        /* QR Code Card */
         .qr-section { margin-top: 20px; padding-top: 15px; border-top: 1px dashed var(--border); text-align: center; }
         .qr-image { width: 135px; height: 135px; border-radius: 8px; border: 1px solid #cbd5e1; padding: 4px; background: #fff; }
 
         nav { background: var(--card); padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
         .profile { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: bold; }
-        .profile img { width: 32px; height: 32px; border-radius: 50%; }
+        .profile img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
         .tabs { display: flex; gap: 5px; }
         .tab-btn { padding: 8px 14px; border: none; background: var(--border); border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; }
         .tab-btn.active { background: var(--primary); color: #fff; }
@@ -88,7 +86,6 @@
 
         .btn-submit { width: 100%; background: var(--primary); color: white; padding: 15px; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 10px; }
         
-        /* History & Delete Profile Button */
         .history-item { padding: 15px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; background: #fff; }
         .history-date { font-weight: bold; color: var(--primary); }
         .history-actions { display: flex; gap: 10px; }
@@ -109,7 +106,6 @@
             background: #fee2e2;
         }
 
-        /* Report Table Styling */
         .table-container { overflow-x: auto; background: #fff; border: 1px solid var(--border); padding: 8px; border-radius: 8px; }
         
         #reportRenderArea {
@@ -199,6 +195,19 @@
         var currentUser = null;
         var recordsData = [];
 
+        // ฟังก์ชันกลางสำหรับเปิดหน้าแอป
+        function showAppScreen(userObj) {
+            currentUser = userObj;
+            document.getElementById('authSection').style.display = 'none';
+            document.getElementById('appSection').style.display = 'block';
+            document.getElementById('userName').innerText = currentUser.name;
+            document.getElementById('userImg').src = currentUser.img || 'https://via.placeholder.com/32';
+
+            initFormDateTime();
+            if (typeof loadHistory === 'function') loadHistory();
+            if (typeof initReportSelects === 'function') initReportSelects();
+        }
+
         function handleLoginClick() {
             var selectEl = document.getElementById('existingUsers');
             var inputEl = document.getElementById('newUserName');
@@ -216,20 +225,11 @@
                 localStorage.setItem('localHeadacheUser', finalName);
             } catch(e) {}
 
-            currentUser = {
+            showAppScreen({
                 id: finalName,
                 name: finalName,
                 img: "https://ui-avatars.com/api/?name=" + encodeURIComponent(finalName) + "&background=random"
-            };
-
-            document.getElementById('authSection').style.display = 'none';
-            document.getElementById('appSection').style.display = 'block';
-            document.getElementById('userName').innerText = currentUser.name;
-            document.getElementById('userImg').src = currentUser.img;
-
-            initFormDateTime();
-            if (typeof loadHistory === 'function') loadHistory();
-            if (typeof initReportSelects === 'function') initReportSelects();
+            });
         }
 
         function initFormDateTime() {
@@ -274,7 +274,6 @@
             window.location.reload();
         }
 
-        // ดึง URL มาสร้าง QR Code อัตโนมัติ
         function renderLoginQRCode() {
             var qrImg = document.getElementById('loginQrImg');
             if (qrImg) {
@@ -318,7 +317,6 @@
                 เข้าสู่ระบบด้วย Google
             </button>
 
-            <!-- ข้อ 2: QR Code สำหรับเข้าใช้งาน/แชร์ให้บุคคลอื่น -->
             <div class="qr-section">
                 <div style="font-size: 13px; font-weight: bold; color: #475569; margin-bottom: 8px;">
                     📲 สแกนเพื่อเข้าใช้งาน หรือส่งต่อให้ผู้อื่น
@@ -463,7 +461,6 @@
             <!-- แท็บประวัติ -->
             <div id="historyTab" class="tab-content">
                 <div class="card">
-                    <!-- ข้อ 1: ส่วนหัวหน้าประวัติ พร้อมปุ่มลบ Profile ทั้งหมด -->
                     <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary); padding-bottom: 8px; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
                         <h2 style="margin: 0; border: none; padding: 0;">ประวัติการบันทึก</h2>
                         <button type="button" class="btn-del-profile" onclick="deleteAllProfileData()">🗑️ ลบข้อมูล Profile นี้ทั้งหมด</button>
@@ -531,6 +528,46 @@
     } catch(err) {
         console.warn("ไม่สามารถสร้าง Supabase Client ได้:", err);
     }
+
+    // === จุดสำคัญ: ตรวจสอบ Session จาก Google OAuth อัตโนมัติเมื่อ Redirect กลับมา ===
+    function checkGoogleOAuthSession() {
+        if (!window.supabaseClient) return;
+
+        function applyUserSession(session) {
+            if (session && session.user) {
+                var u = session.user;
+                var displayName = (u.user_metadata && (u.user_metadata.full_name || u.user_metadata.name)) || (u.email ? u.email.split('@')[0] : 'ผู้ใช้งาน Google');
+                var avatarUrl = (u.user_metadata && u.user_metadata.avatar_url) || ('https://ui-avatars.com/api/?name=' + encodeURIComponent(displayName) + '&background=random');
+                
+                showAppScreen({
+                    id: u.id,
+                    name: displayName,
+                    img: avatarUrl
+                });
+
+                // ล้าง access_token ออกจาก URL เพื่อความปลอดภัยและความสวยงาม
+                if (window.location.hash && window.location.hash.indexOf('access_token') !== -1) {
+                    window.history.replaceState(null, null, window.location.pathname);
+                }
+            }
+        }
+
+        // 1. ตรวจสอบ Session ปัจจุบัน
+        window.supabaseClient.auth.getSession().then(function(res) {
+            if (res.data && res.data.session) {
+                applyUserSession(res.data.session);
+            }
+        });
+
+        // 2. ดักฟัง Event ทันทีที่ล็อกอินเสร็จ
+        window.supabaseClient.auth.onAuthStateChange(function(event, session) {
+            if (session && session.user) {
+                applyUserSession(session);
+            }
+        });
+    }
+
+    checkGoogleOAuthSession();
 
     function loadExistingUsersList() {
         if (!window.supabaseClient) return;
@@ -702,7 +739,6 @@
             });
     }
 
-    // ข้อ 1: ฟังก์ชันลบข้อมูล Profile ทั้งหมด
     function deleteAllProfileData() {
         if (!currentUser || !currentUser.id) return;
         
@@ -715,7 +751,6 @@
             return;
         }
 
-        // ลบข้อมูลที่ผูกกับ user_id นี้ทั้งหมดออกจาก Supabase
         window.supabaseClient.from('headache_records')
             .delete()
             .eq('user_id', currentUser.id)
@@ -724,7 +759,6 @@
                     alert("เกิดข้อผิดพลาดในการลบข้อมูล: " + res.error.message);
                 } else {
                     alert("ลบข้อมูลประวัติของ " + currentUser.name + " เรียบร้อยแล้ว ระบบจะนำคุณกลับสู่หน้าเริ่มต้น");
-                    // เคลียร์แคชและจำชื่อในอุปกรณ์
                     try { localStorage.removeItem('localHeadacheUser'); } catch(e) {}
                     if (window.supabaseClient) {
                         try { window.supabaseClient.auth.signOut(); } catch(e) {}
@@ -998,18 +1032,18 @@
         }
     }
 
-function loginGoogle() {
-    if (!window.supabaseClient) {
-        alert("ยังไม่ได้ตั้งค่าเชื่อมต่อฐานข้อมูล Supabase");
-        return;
-    }
-    window.supabaseClient.auth.signInWithOAuth({ 
-        provider: 'google',
-        options: {
-            redirectTo: window.location.origin
+    function loginGoogle() {
+        if (!window.supabaseClient) {
+            alert("ยังไม่ได้ตั้งค่าเชื่อมต่อฐานข้อมูล Supabase");
+            return;
         }
-    });
-}
+        window.supabaseClient.auth.signInWithOAuth({ 
+            provider: 'google',
+            options: {
+                redirectTo: window.location.origin
+            }
+        });
+    }
     </script>
 </body>
 </html>
