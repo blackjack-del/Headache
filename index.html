@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>บันทึกอาการปวดศีรษะ (Headache Diary)</title>
 
+    <!-- html2pdf สำหรับ Export PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
     <style>
         :root {
             --primary: #4f46e5;
@@ -13,7 +16,7 @@
             --text: #1e293b;
             --border: #e2e8f0;
             --danger: #ef4444;
-            --dot-color: #fca5a5;
+            --dot-color: #f87171;
         }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; }
         .container { max-width: 800px; margin: 0 auto; padding: 15px; }
@@ -50,7 +53,7 @@
         input[type="date"], input[type="time"], input[type="text"], input[type="number"], select { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 16px; box-sizing: border-box; }
         
         .options-group { display: flex; flex-direction: column; gap: 8px; background: #f1f5f9; padding: 10px; border-radius: 6px; }
-        .option-label { display: flex; align-items: center; gap: 8px; font-weight: normal; margin: 0; font-size: 15px; }
+        .option-label { display: flex; align-items: center; gap: 8px; font-weight: normal; margin: 0; font-size: 15px; cursor: pointer; }
         .option-label input { width: 18px; height: 18px; accent-color: var(--primary); }
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
@@ -62,13 +65,17 @@
         .btn-view { color: var(--primary); text-decoration: underline; background: none; border: none; cursor: pointer; font-weight: bold; }
         .btn-del { color: var(--danger); background: none; border: none; cursor: pointer; }
 
+        /* Report Table Styling */
         .table-container { overflow-x: auto; background: #fff; border: 1px solid var(--border); padding: 10px; }
-        #reportTable { border-collapse: collapse; width: 100%; min-width: 900px; font-size: 11px; table-layout: fixed; }
-        #reportTable th, #reportTable td { border: 1px solid #000; padding: 2px 4px; text-align: center; vertical-align: middle; }
-        #reportTable th.col-head { text-align: left; width: 100px; background: #f1f5f9; }
-        #reportTable th.col-sub { text-align: left; width: 80px; background: #f8fafc; }
-        .red-dot { width: 10px; height: 10px; background-color: var(--dot-color); border-radius: 50%; margin: 0 auto; display: block; }
-        .text-val { font-size: 9px; line-height: 1.1; }
+        #reportTable { border-collapse: collapse; width: 100%; min-width: 1000px; font-size: 11px; table-layout: fixed; background: #fff; }
+        #reportTable th, #reportTable td { border: 1px solid #334155; padding: 3px 2px; text-align: center; vertical-align: middle; }
+        #reportTable th.col-head, #reportTable td.col-head { text-align: left; width: 125px; background: #f8fafc; font-weight: bold; padding-left: 5px; }
+        #reportTable th.col-sub, #reportTable td.col-sub { text-align: left; width: 95px; background: #ffffff; padding-left: 4px; }
+        #reportTable th.col-example, #reportTable td.col-example { width: 45px; background: #f1f5f9; color: #475569; font-size: 10px; }
+        
+        .example-box { display: inline-block; width: 11px; height: 11px; border: 1px solid #64748b; border-radius: 1px; background: #fff; }
+        .red-dot { width: 10px; height: 10px; background-color: var(--dot-color); border: 1px solid #dc2626; border-radius: 50%; margin: 0 auto; display: block; }
+        .text-val { font-size: 9px; line-height: 1.1; word-break: break-word; }
 
         .modal { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; padding: 15px; box-sizing: border-box; }
         .modal.active { display: flex; }
@@ -81,10 +88,9 @@
     </style>
 
     <!-- ========================================== -->
-    <!-- ชั้นที่ 1: UI & LOGIN CORE (แยกเด็ดขาด ไม่พึ่งพาใคร) -->
+    <!-- ชั้นที่ 1: UI & LOGIN CORE -->
     <!-- ========================================== -->
     <script>
-        // ดัก Error เฉพาะที่เกิดในหน้าตัวเอง ไม่แจ้งเตือน Script error ไร้สาระจากภายนอก
         window.addEventListener('error', function(e) {
             if (e.message && e.message !== 'Script error.') {
                 alert("แจ้งเตือนข้อผิดพลาด:\n" + e.message + "\n(บรรทัดที่: " + e.lineno + ")");
@@ -117,7 +123,6 @@
                 img: "https://ui-avatars.com/api/?name=" + encodeURIComponent(finalName) + "&background=random"
             };
 
-            // สลับหน้าจอ
             document.getElementById('authSection').style.display = 'none';
             document.getElementById('appSection').style.display = 'block';
             document.getElementById('userName').innerText = currentUser.name;
@@ -150,6 +155,18 @@
             if (tabId === 'exportTab' && typeof generateReport === 'function') generateReport();
         }
 
+        function toggleAuraOther() {
+            var cb = document.getElementById('auraOtherCb');
+            var wrap = document.getElementById('auraOtherWrapper');
+            if (cb && wrap) {
+                wrap.style.display = cb.checked ? 'block' : 'none';
+                if (!cb.checked) {
+                    var txt = document.getElementById('auraOtherText');
+                    if (txt) txt.value = '';
+                }
+            }
+        }
+
         function logout() {
             try { localStorage.removeItem('localHeadacheUser'); } catch(e) {}
             if (window.supabaseClient) {
@@ -158,7 +175,6 @@
             window.location.reload();
         }
 
-        // ตรวจสอบล็อกอินเดิมอัตโนมัติ
         window.addEventListener('DOMContentLoaded', function() {
             try {
                 var saved = localStorage.getItem('localHeadacheUser');
@@ -183,7 +199,7 @@
                 <option value="">-- เลือกชื่อเดิมในระบบ --</option>
             </select>
             <div class="divider">หรือพิมพ์ชื่อใหม่</div>
-            <input type="text" id="newUserName" placeholder="ใส่ชื่อของคุณ เช่น กิตติ">
+            <input type="text" id="newUserName" placeholder="ใส่ชื่อของคุณ เช่น สมชาย">
             <button type="button" class="btn-local" onclick="handleLoginClick()">เข้าสู่ระบบ</button>
             
             <div class="divider">ตัวเลือกเสริม</div>
@@ -221,20 +237,25 @@
                             <div style="flex:1;"><label>เวลา</label><input type="time" id="r_time" required></div>
                         </div>
 
+                        <!-- 1 & 2. อาการนำมาก่อน (ตัด Aura และมี Textbox เมื่อเลือกมีอาการอื่น) -->
                         <div class="form-row">
-                            <label>อาการนำมาก่อน (Aura)</label>
+                            <label>อาการนำมาก่อน</label>
                             <div class="options-group">
                                 <label class="option-label"><input type="checkbox" name="aura" value="เห็นแสง"> เห็นแสง</label>
-                                <label class="option-label"><input type="checkbox" name="aura" value="มีอาการอื่น"> มีอาการอื่น</label>
+                                <label class="option-label"><input type="checkbox" name="aura" id="auraOtherCb" value="มีอาการอื่น" onchange="toggleAuraOther()"> มีอาการอื่น</label>
+                                <div id="auraOtherWrapper" style="display: none; margin-top: 5px; padding-left: 26px;">
+                                    <input type="text" id="auraOtherText" placeholder="ระบุอาการอื่น เช่น ตาพร่ามัว, แขนขาชา">
+                                </div>
                             </div>
                         </div>
 
+                        <!-- 3. ตำแหน่งที่ปวดเป็น Radio button -->
                         <div class="form-row">
                             <label>ตำแหน่งที่ปวด</label>
                             <div class="options-group">
-                                <label class="option-label"><input type="checkbox" name="loc" value="ซ้าย"> ซ้าย</label>
-                                <label class="option-label"><input type="checkbox" name="loc" value="ขวา"> ขวา</label>
-                                <label class="option-label"><input type="checkbox" name="loc" value="ทั้ง 2 ข้าง"> ทั้ง 2 ข้าง</label>
+                                <label class="option-label"><input type="radio" name="loc" value="ซ้าย"> ซ้าย</label>
+                                <label class="option-label"><input type="radio" name="loc" value="ขวา"> ขวา</label>
+                                <label class="option-label"><input type="radio" name="loc" value="ทั้ง 2 ข้าง"> ทั้ง 2 ข้าง</label>
                             </div>
                         </div>
 
@@ -331,7 +352,7 @@
                 </div>
             </div>
 
-            <!-- แท็บรายงาน -->
+            <!-- แท็บรายงาน (Export) -->
             <div id="exportTab" class="tab-content">
                 <div class="card">
                     <h2>ตารางรายงานประจำเดือน</h2>
@@ -339,7 +360,7 @@
                         <select id="monthSelect" style="width: auto;"></select>
                         <select id="yearSelect" style="width: auto;"></select>
                         <button class="btn-local" type="button" style="width:auto; padding:8px 16px;" onclick="generateReport()">สร้างตาราง</button>
-                        <button class="btn-local" type="button" style="width:auto; padding:8px 16px; background:#ef4444;" onclick="window.print()">พิมพ์ / บันทึก PDF</button>
+                        <button class="btn-local" type="button" style="width:auto; padding:8px 16px; background:#ef4444;" onclick="exportPDF()">Export PDF</button>
                     </div>
                     
                     <div class="table-container" id="reportRenderArea"></div>
@@ -362,21 +383,19 @@
     <!-- ========================================== -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" crossorigin="anonymous"></script>
     <script>
-    // ข้อควรระวัง: ตรวจสอบให้แน่ใจว่าเป็นเครื่องหมาย double-quote ปกติ (") ห้ามเป็นเครื่องหมายโค้ง (“ ”)
-    var SUPABASE_URL = "https://zglonauqilgzbukygzwi.supabase.co";
-    var SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpnbG9uYXVxaWxnemJ1a3lnendpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyMzA1MjgsImV4cCI6MjEwODgwNjUyOH0.vGCmTsz3lb42W0hXfZITSMhvwPw8JlbiPL9W2YCuu94";
+    const SUPABASE_URL = "https://zglonauqilgzbukygzwi.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpnbG9uYXVxaWxnemJ1a3lnendpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyMzA1MjgsImV4cCI6MjEwODgwNjUyOH0.vGCmTsz3lb42W0hXfZITSMhvwPw8JlbiPL9W2YCuu94";
 
     window.supabaseClient = null;
 
     try {
         if (window.supabase && SUPABASE_URL.indexOf("https://") === 0) {
-            window.supabaseClient = window.supabase.createClient(SUPABASE_URL.trim(), SUPABASE_KEY.trim());
+            window.supabaseClient = window.supabase.createClient(SUPABASE_URL.trim(), SUPABASE_ANON_KEY.trim());
         }
     } catch(err) {
         console.warn("ไม่สามารถสร้าง Supabase Client ได้:", err);
     }
 
-    // โหลดรายชื่อผู้ใช้เดิม
     function loadExistingUsersList() {
         if (!window.supabaseClient) return;
         window.supabaseClient.from('headache_records').select('user_id')
@@ -400,7 +419,15 @@
     }
     loadExistingUsersList();
 
-    // บันทึกข้อมูล
+    // ตัวช่วยตรวจสอบค่าว่ามีในอาเรย์หรือข้อความหรือไม่
+    function hasVal(field, val) {
+        if (!field) return false;
+        if (Array.isArray(field)) {
+            return field.some(function(item) { return item && String(item).indexOf(val) !== -1; });
+        }
+        return String(field).indexOf(val) !== -1;
+    }
+
     document.getElementById('recordForm').addEventListener('submit', function(e) {
         e.preventDefault();
         if (!window.supabaseClient) {
@@ -410,6 +437,23 @@
 
         var btn = document.getElementById('saveBtn');
         btn.disabled = true; btn.innerText = "กำลังบันทึก...";
+
+        function getAuraValues() {
+            var arr = [];
+            document.querySelectorAll('input[name="aura"]:checked').forEach(function(cb) {
+                if (cb.value === 'มีอาการอื่น') {
+                    var otherText = document.getElementById('auraOtherText') ? document.getElementById('auraOtherText').value.trim() : '';
+                    if (otherText) {
+                        arr.push('มีอาการอื่น: ' + otherText);
+                    } else {
+                        arr.push('มีอาการอื่น');
+                    }
+                } else {
+                    arr.push(cb.value);
+                }
+            });
+            return arr;
+        }
 
         function getChecked(name) {
             var arr = [];
@@ -421,12 +465,14 @@
             return el ? el.value : null;
         }
 
+        var locVal = getRadio('loc');
+
         var payload = {
             user_id: currentUser.id,
             record_date: document.getElementById('r_date').value,
             record_time: document.getElementById('r_time').value,
-            aura: getChecked('aura'),
-            location: getChecked('loc'),
+            aura: getAuraValues(),
+            location: locVal ? [locVal] : [],
             pain_character: getChecked('char'),
             severity: getRadio('severity'),
             worsen_movement: getRadio('movement'),
@@ -449,13 +495,13 @@
                 } else {
                     alert("บันทึกข้อมูลเรียบร้อยแล้ว");
                     document.getElementById('recordForm').reset();
+                    document.getElementById('auraOtherWrapper').style.display = 'none';
                     initFormDateTime();
                     loadHistory();
                 }
             });
     });
 
-    // โหลดประวัติ
     function loadHistory() {
         if (!window.supabaseClient || !currentUser) return;
         window.supabaseClient.from('headache_records')
@@ -536,94 +582,228 @@
         mSel.value = new Date().getMonth();
     }
 
+    // === โครงสร้าง Template ตารางรายงานตามแบบฟอร์มจริง ===
     function generateReport() {
-        var y = parseInt(document.getElementById('yearSelect').value);
-        var mStr = document.getElementById('monthSelect').value;
-        
-        var filteredData = recordsData.filter(function(r) { return r.record_date.indexOf(y.toString()) === 0; });
-        if(mStr !== 'all') {
-            var m = parseInt(mStr) + 1;
-            var mPrefix = m < 10 ? '0'+m : String(m);
-            filteredData = filteredData.filter(function(r) { return r.record_date.split('-')[1] === mPrefix; });
-        }
+        var ySel = document.getElementById('yearSelect');
+        var mSel = document.getElementById('monthSelect');
+        if (!ySel || !mSel) return;
 
-        var daysInMonth = mStr === 'all' ? 31 : new Date(y, parseInt(mStr)+1, 0).getDate();
-        var dayLetters = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+        var y = parseInt(ySel.value, 10);
+        var mStr = mSel.value;
         
-        var html = '<table id="reportTable"><thead><tr><th colspan="2" class="col-head"></th>';
-        for(var i=1; i<=daysInMonth; i++) {
-            var dayText = '';
-            if(mStr !== 'all') {
-                var d = new Date(y, parseInt(mStr), i);
-                dayText = dayLetters[d.getDay()];
-            }
-            html += '<th style="width:20px; font-weight:normal;">' + dayText + '</th>';
+        // กรองข้อมูลตามปีและเดือนที่เลือก
+        var filteredData = recordsData.filter(function(r) {
+            if (!r.record_date) return false;
+            var parts = String(r.record_date).split('T')[0].split('-');
+            if (parts.length < 3) return false;
+            var recYear = parseInt(parts[0], 10);
+            var recMonth = parseInt(parts[1], 10) - 1;
+            
+            if (recYear !== y) return false;
+            if (mStr !== 'all' && recMonth !== parseInt(mStr, 10)) return false;
+            return true;
+        });
+
+        var targetMonth = mStr === 'all' ? new Date().getMonth() : parseInt(mStr, 10);
+        var daysInMonth = new Date(y, targetMonth + 1, 0).getDate();
+        var dayLetters = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+
+        var html = '<table id="reportTable"><thead>';
+
+        // Header แถว 1: วันในสัปดาห์
+        html += '<tr>';
+        html += '<th colspan="2" class="col-head">คำถาม / ตัวเลือก</th>';
+        html += '<th class="col-example">ศ.</th>';
+        for (var i = 1; i <= daysInMonth; i++) {
+            var d = new Date(y, targetMonth, i);
+            var dayText = dayLetters[d.getDay()];
+            html += '<th style="width:22px; font-weight:normal;">' + dayText + '</th>';
         }
-        html += '</tr><tr><th class="col-head" colspan="2">วันที่</th>';
-        for(var i=1; i<=daysInMonth; i++) html += '<th>' + i + '</th>';
+        html += '</tr>';
+
+        // Header แถว 2: วันที่
+        html += '<tr>';
+        html += '<th colspan="2" class="col-head">วันที่</th>';
+        html += '<th class="col-example">1/12</th>';
+        for (var i = 1; i <= daysInMonth; i++) {
+            html += '<th>' + i + '</th>';
+        }
         html += '</tr></thead><tbody>';
 
-        var rows = [
-            { label: 'เวลาที่ปวดศีรษะ', sub: '', field: 'time' },
-            { label: 'อาการที่เกิดขึ้นนำมา<br>ก่อนอาการปวดศีรษะ', sub: 'เห็นแสง', check: function(r) { return r.aura && r.aura.indexOf('เห็นแสง') !== -1; } },
-            { label: '', sub: 'มีอาการอื่น', check: function(r) { return r.aura && r.aura.indexOf('มีอาการอื่น') !== -1; } },
-            { label: 'ตำแหน่งที่ปวด', sub: 'ซ้าย', check: function(r) { return r.location && r.location.indexOf('ซ้าย') !== -1; } },
-            { label: '', sub: 'ขวา', check: function(r) { return r.location && r.location.indexOf('ขวา') !== -1; } },
-            { label: '', sub: 'ทั้ง 2 ข้าง', check: function(r) { return r.location && r.location.indexOf('ทั้ง 2 ข้าง') !== -1; } },
-            { label: 'ลักษณะที่ปวด', sub: 'ตุบๆ', check: function(r) { return r.pain_character && r.pain_character.indexOf('ตุบๆ') !== -1; } },
-            { label: '', sub: 'กดบีบ', check: function(r) { return r.pain_character && r.pain_character.indexOf('กดบีบ') !== -1; } },
-            { label: '', sub: 'แหลมปรี๊ด', check: function(r) { return r.pain_character && r.pain_character.indexOf('แหลมปรี๊ด') !== -1; } },
-            { label: 'ความรุนแรง', sub: 'เล็กน้อย ถึง<br>ทำงานต่อได้', check: function(r) { return r.severity && r.severity.indexOf('เล็กน้อย') !== -1; } },
-            { label: '', sub: 'ปานกลาง<br>ทำงานได้ลดลง', check: function(r) { return r.severity && r.severity.indexOf('ปานกลาง') !== -1; } },
-            { label: '', sub: 'รุนแรง ทำงาน<br>ต่อไม่ได้', check: function(r) { return r.severity && r.severity.indexOf('รุนแรง') !== -1; } },
-            { label: 'อาการปวดแย่ลงเมื่อ<br>เคลื่อนไหว/ออกแรง', sub: 'แย่ลง', check: function(r) { return r.worsen_movement === 'แย่ลง'; } },
-            { label: '', sub: 'ไม่เปลี่ยนแปลง', check: function(r) { return r.worsen_movement === 'ไม่เปลี่ยนแปลง'; } },
-            { label: 'มีคลื่นไส้ร่วมด้วย<br>หรือไม่', sub: 'มี', check: function(r) { return r.nausea === 'มี'; } },
-            { label: '', sub: 'ไม่มี', check: function(r) { return r.nausea === 'ไม่มี'; } },
-            { label: 'มีตาแดง น้ำตา น้ำมูก<br>ไหลร่วมด้วย', sub: 'มี', check: function(r) { return r.autonomic === 'มี'; } },
-            { label: '', sub: 'ไม่มี', check: function(r) { return r.autonomic === 'ไม่มี'; } },
-            { label: 'อาการปวดแย่ลงเมื่อมี<br>แสงจ้าๆ', sub: 'แย่ลง', check: function(r) { return r.worsen_light === 'แย่ลง'; } },
-            { label: '', sub: 'ไม่เปลี่ยนแปลง', check: function(r) { return r.worsen_light === 'ไม่เปลี่ยนแปลง'; } },
-            { label: 'อาการปวดแย่ลงเมื่อได้<br>ยินเสียงดังๆ', sub: 'แย่ลง', check: function(r) { return r.worsen_noise === 'แย่ลง'; } },
-            { label: '', sub: 'ไม่เปลี่ยนแปลง', check: function(r) { return r.worsen_noise === 'ไม่เปลี่ยนแปลง'; } },
-            { label: 'ปวดอยู่นานเท่าใด', sub: '', field: 'duration' },
-            { label: 'สิ่งกระตุ้นอาการปวด', sub: 'ระบุ', field: 'triggers' },
-            { label: 'ยาและขนาดที่กิน', sub: 'ชื่อยา', field: 'meds' }
+        // รายการกลุ่มคำถามและตัวเลือก (ตรงตามแบบฟอร์ม)
+        var groups = [
+            {
+                label: 'เวลาที่ปวดศีรษะ',
+                rows: [
+                    { sub: '', example: '9.00', field: 'time' }
+                ]
+            },
+            {
+                label: 'อาการที่เกิดขึ้นนำมาก่อน<br>อาการปวดศีรษะ',
+                rows: [
+                    { sub: 'เห็นแสง', example: '<span class="example-box"></span>', check: function(r) { return hasVal(r.aura, 'เห็นแสง'); } },
+                    { 
+                        sub: 'มีอาการอื่น', 
+                        example: '<span class="example-box"></span>', 
+                        check: function(r) { return hasVal(r.aura, 'มีอาการอื่น'); },
+                        getExtra: function(r) {
+                            if (!r.aura) return '';
+                            for (var k = 0; k < r.aura.length; k++) {
+                                if (r.aura[k].indexOf('มีอาการอื่น:') !== -1) {
+                                    return r.aura[k].replace('มีอาการอื่น:', '').trim();
+                                }
+                            }
+                            return '';
+                        }
+                    }
+                ]
+            },
+            {
+                label: 'ตำแหน่งที่ปวด',
+                rows: [
+                    { sub: 'ซ้าย', example: '<span class="example-box"></span>', check: function(r) { return hasVal(r.location, 'ซ้าย'); } },
+                    { sub: 'ขวา', example: '<span class="example-box"></span>', check: function(r) { return hasVal(r.location, 'ขวา'); } },
+                    { sub: 'ทั้ง 2 ข้าง', example: '<span class="example-box"></span>', check: function(r) { return hasVal(r.location, 'ทั้ง 2 ข้าง'); } }
+                ]
+            },
+            {
+                label: 'ลักษณะที่ปวด',
+                rows: [
+                    { sub: 'ตุบๆ', example: '<span class="example-box"></span>', check: function(r) { return hasVal(r.pain_character, 'ตุบๆ'); } },
+                    { sub: 'กดบีบ', example: '<span class="example-box"></span>', check: function(r) { return hasVal(r.pain_character, 'กดบีบ'); } },
+                    { sub: 'แหลมปรี๊ด', example: '<span class="example-box"></span>', check: function(r) { return hasVal(r.pain_character, 'แหลมปรี๊ด'); } }
+                ]
+            },
+            {
+                label: 'ความรุนแรงของอาการปวด',
+                rows: [
+                    { sub: 'เล็กน้อย ถึง<br>ทำงานต่อได้', example: '<span class="example-box"></span>', check: function(r) { return hasVal(r.severity, 'เล็กน้อย'); } },
+                    { sub: 'ปานกลาง<br>ทำงานได้ลดลง', example: '<span class="example-box"></span>', check: function(r) { return hasVal(r.severity, 'ปานกลาง'); } },
+                    { sub: 'รุนแรง ทำงาน<br>ต่อไม่ได้', example: '<span class="example-box"></span>', check: function(r) { return hasVal(r.severity, 'รุนแรง'); } }
+                ]
+            },
+            {
+                label: 'อาการปวดแย่ลงเมื่อ<br>เคลื่อนไหวหรือออกแรง',
+                rows: [
+                    { sub: 'แย่ลง', example: '<span class="example-box"></span>', check: function(r) { return r.worsen_movement === 'แย่ลง'; } },
+                    { sub: 'ไม่เปลี่ยนแปลง', example: '<span class="example-box"></span>', check: function(r) { return r.worsen_movement === 'ไม่เปลี่ยนแปลง'; } }
+                ]
+            },
+            {
+                label: 'มีคลื่นไส้ร่วมด้วย<br>หรือไม่',
+                rows: [
+                    { sub: 'มี', example: '<span class="example-box"></span>', check: function(r) { return r.nausea === 'มี'; } },
+                    { sub: 'ไม่มี', example: '<span class="example-box"></span>', check: function(r) { return r.nausea === 'ไม่มี'; } }
+                ]
+            },
+            {
+                label: 'มีตาแดง น้ำตา น้ำมูก<br>ไหลร่วมด้วย',
+                rows: [
+                    { sub: 'มี', example: '<span class="example-box"></span>', check: function(r) { return r.autonomic === 'มี'; } },
+                    { sub: 'ไม่มี', example: '<span class="example-box"></span>', check: function(r) { return r.autonomic === 'ไม่มี'; } }
+                ]
+            },
+            {
+                label: 'อาการปวดแย่ลงเมื่อมี<br>แสงจ้าๆ',
+                rows: [
+                    { sub: 'แย่ลง', example: '<span class="example-box"></span>', check: function(r) { return r.worsen_light === 'แย่ลง'; } },
+                    { sub: 'ไม่เปลี่ยนแปลง', example: '<span class="example-box"></span>', check: function(r) { return r.worsen_light === 'ไม่เปลี่ยนแปลง'; } }
+                ]
+            },
+            {
+                label: 'อาการปวดแย่ลงเมื่อได้<br>ยินเสียงดังๆ',
+                rows: [
+                    { sub: 'แย่ลง', example: '<span class="example-box"></span>', check: function(r) { return r.worsen_noise === 'แย่ลง'; } },
+                    { sub: 'ไม่เปลี่ยนแปลง', example: '<span class="example-box"></span>', check: function(r) { return r.worsen_noise === 'ไม่เปลี่ยนแปลง'; } }
+                ]
+            },
+            {
+                label: 'ปวดอยู่นานเท่าใด',
+                rows: [
+                    { sub: '', example: '4ชม.', field: 'duration' }
+                ]
+            },
+            {
+                label: 'สิ่งกระตุ้นอาการปวด',
+                rows: [
+                    { sub: 'ระบุ', example: 'เครียด', field: 'triggers' }
+                ]
+            },
+            {
+                label: 'ยาและขนาดที่กิน',
+                rows: [
+                    { sub: 'ชื่อยา', example: 'พารา', field: 'meds' }
+                ]
+            }
         ];
 
-        rows.forEach(function(row, rowIndex) {
-            html += '<tr>';
-            if (row.label !== '') {
-                var spanCount = rows.filter(function(r) { return r.label === row.label || (r.label === '' && rowIndex > 0 && rows[rowIndex-1].label !== '' && !r.field); }).length;
-                html += '<td class="col-head" rowspan="' + spanCount + '">' + row.label + '</td>';
-            }
-            if (row.sub !== '' || row.field) html += '<td class="col-sub">' + row.sub + '</td>';
-            
-            for(var i=1; i<=daysInMonth; i++) {
-                var recordsForDay = filteredData.filter(function(r) {
-                    if (mStr === 'all') return parseInt(r.record_date.split('-')[2]) === i;
-                    var parts = r.record_date.split('-');
-                    return parseInt(parts[2]) === i && (parseInt(parts[1]) - 1) === parseInt(mStr);
-                });
-
-                var cellContent = '';
-                if(recordsForDay.length > 0) {
-                    var rec = recordsForDay[0]; 
-                    if(row.field === 'time') cellContent = '<div class="text-val">' + rec.record_time.slice(0,5) + '</div>';
-                    else if(row.field === 'duration') cellContent = '<div class="text-val">' + (rec.duration_val ? rec.duration_val+rec.duration_unit[0] : '') + '</div>';
-                    else if(row.field === 'triggers') cellContent = '<div class="text-val">' + (rec.triggers || '') + '</div>';
-                    else if(row.field === 'meds') cellContent = '<div class="text-val" style="font-size:8px;">' + (rec.med_name || '') + '<br>' + (rec.med_dose || '') + '</div>';
-                    else if(row.check && row.check(rec)) {
-                        cellContent = '<div class="red-dot"></div>';
-                    }
+        // เรนเดอร์แถวข้อมูลทั้งหมด
+        groups.forEach(function(group) {
+            group.rows.forEach(function(row, rIdx) {
+                html += '<tr>';
+                // คอลัมน์ที่ 1: โจทย์หัวข้อหลัก
+                if (rIdx === 0) {
+                    html += '<td class="col-head" rowspan="' + group.rows.length + '">' + group.label + '</td>';
                 }
-                html += '<td>' + cellContent + '</td>';
-            }
-            html += '</tr>';
+                // คอลัมน์ที่ 2: ตัวเลือก
+                html += '<td class="col-sub">' + (row.sub || '') + '</td>';
+                // คอลัมน์ที่ 3: ตัวอย่างการกรอก (ต.ย.)
+                html += '<td class="col-example">' + (row.example || '') + '</td>';
+
+                // คอลัมน์วันที่ 1 ถึง 31
+                for (var i = 1; i <= daysInMonth; i++) {
+                    var recordsForDay = filteredData.filter(function(r) {
+                        var parts = String(r.record_date).split('T')[0].split('-');
+                        return parseInt(parts[2], 10) === i;
+                    });
+
+                    var cellContent = '';
+                    if (recordsForDay.length > 0) {
+                        var rec = recordsForDay[0];
+                        if (row.field === 'time') {
+                            cellContent = '<div class="text-val">' + (rec.record_time ? rec.record_time.slice(0,5) : '') + '</div>';
+                        } else if (row.field === 'duration') {
+                            cellContent = '<div class="text-val">' + (rec.duration_val ? (rec.duration_val + (rec.duration_unit ? rec.duration_unit[0] : '')) : '') + '</div>';
+                        } else if (row.field === 'triggers') {
+                            cellContent = '<div class="text-val">' + (rec.triggers || '') + '</div>';
+                        } else if (row.field === 'meds') {
+                            cellContent = '<div class="text-val" style="font-size:8px;">' + (rec.med_name || '') + (rec.med_dose ? '<br>' + rec.med_dose : '') + '</div>';
+                        } else if (row.check && row.check(rec)) {
+                            cellContent = '<div class="red-dot"></div>';
+                            if (row.getExtra) {
+                                var extra = row.getExtra(rec);
+                                if (extra) {
+                                    cellContent += '<div class="text-val" style="font-size:8px; margin-top:2px;">' + extra + '</div>';
+                                }
+                            }
+                        }
+                    }
+                    html += '<td>' + cellContent + '</td>';
+                }
+                html += '</tr>';
+            });
         });
 
         html += '</tbody></table>';
         document.getElementById('reportRenderArea').innerHTML = html;
+    }
+
+    function exportPDF() {
+        var element = document.getElementById('reportRenderArea');
+        var mSel = document.getElementById('monthSelect');
+        var monthName = mSel.options[mSel.selectedIndex].text;
+        var opt = {
+            margin: 0.15,
+            filename: 'Headache_Diary_' + monthName + '.pdf',
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true },
+            jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' }
+        };
+        if (window.html2pdf) {
+            html2pdf().set(opt).from(element).save();
+        } else {
+            window.print();
+        }
     }
 
     function loginGoogle() {
