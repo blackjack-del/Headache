@@ -5,7 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>บันทึกอาการปวดศีรษะ (Headache Diary)</title>
 
-    <!-- html2pdf & html2canvas bundle สำหรับ Export PDF และ JPG -->
+    <!-- Google Fonts: Sarabun (ฟอนต์มาตรฐานภาษาไทย แก้ปัญหาสระซ้อน สระขี่กัน วรรณยุกต์เพี้ยน) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+    <!-- html2canvas ตัวเต็มสำหรับ Export รูปภาพ JPG -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- html2pdf สำหรับ Export PDF 1 หน้า -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <style>
@@ -18,8 +25,29 @@
             --danger: #ef4444;
             --dot-color: #ef4444;
         }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; }
-        .container { max-width: 800px; margin: 0 auto; padding: 15px; }
+        
+        /* กำหนดให้ใช้ฟอนต์ Sarabun ทั้งระบบ */
+        body, input, select, button, table, textarea { 
+            font-family: 'Sarabun', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            color: var(--text); 
+        }
+        
+        body { background: var(--bg); margin: 0; padding: 0; }
+        
+        /* ข้อ 3: การจัดการ Layout (มือถือขนาดเดิม / คอมพิวเตอร์ขยายเต็มจอ) */
+        .container { 
+            max-width: 800px; 
+            margin: 0 auto; 
+            padding: 15px; 
+            transition: max-width 0.2s ease;
+        }
+
+        /* เมื่อเปิดบนจอคอมพิวเตอร์ (ความกว้างตั้งแต่ 1024px ขึ้นไป) */
+        @media (min-width: 1024px) {
+            .container {
+                max-width: 96% !important; /* ขยายเต็มหน้าจอคอม */
+            }
+        }
         
         #authSection { display: flex; min-height: 100vh; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 20px; box-sizing: border-box; }
         .auth-card { background: #fff; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); width: 100%; max-width: 400px; border: 1px solid var(--border); box-sizing: border-box; }
@@ -34,11 +62,11 @@
         
         .btn-google { width: 100%; background: #fff; color: #333; border: 1px solid #ccc; padding: 12px; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; }
 
-        nav { background: var(--card); padding: 12px 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        nav { background: var(--card); padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
         .profile { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: bold; }
         .profile img { width: 32px; height: 32px; border-radius: 50%; }
         .tabs { display: flex; gap: 5px; }
-        .tab-btn { padding: 8px 12px; border: none; background: var(--border); border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; }
+        .tab-btn { padding: 8px 14px; border: none; background: var(--border); border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; }
         .tab-btn.active { background: var(--primary); color: #fff; }
         .btn-logout { background: var(--danger); color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
 
@@ -65,8 +93,8 @@
         .btn-view { color: var(--primary); text-decoration: underline; background: none; border: none; cursor: pointer; font-weight: bold; }
         .btn-del { color: var(--danger); background: none; border: none; cursor: pointer; }
 
-        /* Report Table Styling (ปรับกระชับให้พอดี 1 หน้า A4 แนวนอน) */
-        .table-container { overflow-x: auto; background: #fff; border: 1px solid var(--border); padding: 10px; }
+        /* Report Table Styling */
+        .table-container { overflow-x: auto; background: #fff; border: 1px solid var(--border); padding: 8px; border-radius: 8px; }
         
         #reportRenderArea {
             position: relative;
@@ -75,13 +103,13 @@
             box-sizing: border-box;
         }
 
-        /* ลายน้ำชื่อผู้ใช้ */
+        /* ลายน้ำโปรไฟล์ด้านหลัง */
         .watermark {
             position: absolute;
             top: 55%;
             left: 50%;
             transform: translate(-50%, -50%) rotate(-12deg);
-            font-size: 68px;
+            font-size: 72px;
             font-weight: 800;
             color: rgba(79, 70, 229, 0.04);
             pointer-events: none;
@@ -105,11 +133,11 @@
             padding: 1.5px 1px; 
             text-align: center; 
             vertical-align: middle; 
-            line-height: 1.1;
+            line-height: 1.15;
         }
         #reportTable th.col-head, #reportTable td.col-head { 
             text-align: left; 
-            width: 145px; 
+            width: 140px; 
             background: #f8fafc; 
             font-weight: bold; 
             padding-left: 4px;
@@ -255,7 +283,6 @@
                 <option value="">-- เลือกชื่อเดิมในระบบ --</option>
             </select>
             <div class="divider">หรือพิมพ์ชื่อใหม่</div>
-            <!-- ข้อ 4: เปลี่ยนตัวอย่างเป็น สมชาย -->
             <input type="text" id="newUserName" placeholder="ใส่ชื่อของคุณ เช่น สมชาย">
             <button type="button" class="btn-local" onclick="handleLoginClick()">เข้าสู่ระบบ</button>
             
@@ -294,7 +321,7 @@
                             <div style="flex:1;"><label>เวลา</label><input type="time" id="r_time" required></div>
                         </div>
 
-                        <!-- ข้อ 1 & 2: ตัด Aura ออก และมี Textbox เมื่อเลือกมีอาการอื่น -->
+                        <!-- 1. อาการนำมาก่อน -->
                         <div class="form-row">
                             <label>อาการนำมาก่อน</label>
                             <div class="options-group">
@@ -306,7 +333,7 @@
                             </div>
                         </div>
 
-                        <!-- ข้อ 3: ตำแหน่งที่ปวดเป็น Radio button ทั้งหมด -->
+                        <!-- 2. ตำแหน่งที่ปวดเป็น Radio button -->
                         <div class="form-row">
                             <label>ตำแหน่งที่ปวด</label>
                             <div class="options-group">
@@ -413,17 +440,14 @@
             <div id="exportTab" class="tab-content">
                 <div class="card">
                     <h2>ตารางรายงานประจำเดือน</h2>
-                    <!-- ตัวเลือกเดือน/ปี และปุ่ม Export -->
                     <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; align-items: center;">
                         <select id="monthSelect" style="width: auto;" onchange="generateReport()"></select>
                         <select id="yearSelect" style="width: auto;" onchange="generateReport()"></select>
-                        <!-- ข้อ 3: ปุ่ม Export JPG และ PDF -->
                         <button class="btn-local" type="button" style="width:auto; padding:8px 16px; background:#0284c7;" onclick="exportJPG()">🖼️ Export รูปภาพ (JPG)</button>
                         <button class="btn-local" type="button" style="width:auto; padding:8px 16px; background:#ef4444;" onclick="exportPDF()">📄 Export PDF (1 หน้า)</button>
                     </div>
                     
                     <div class="table-container">
-                        <!-- พื้นที่เรนเดอร์ที่จะนำไปทำภาพ/PDF พร้อมลายน้ำชื่อ -->
                         <div id="reportRenderArea">
                             <div id="watermarkEl" class="watermark"></div>
                             <div id="reportHeader" style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:4px; padding-bottom:3px; border-bottom:1.5px solid #4f46e5; position:relative; z-index:2;">
@@ -669,13 +693,11 @@
         var monthName = mSel.options[mSel.selectedIndex].text;
         var yearDisplay = ySel.options[ySel.selectedIndex].text;
 
-        // ข้อ 4: อัปเดตชื่อผู้ใช้และลายน้ำ
         var uName = (currentUser && currentUser.name) ? currentUser.name : 'ทั่วไป';
         document.getElementById('reportUserName').innerText = uName;
         document.getElementById('reportMonthYear').innerText = monthName + ' ' + yearDisplay;
         document.getElementById('watermarkEl').innerText = uName;
 
-        // กรองข้อมูลเฉพาะปีและเดือนที่เลือก
         var filteredData = recordsData.filter(function(r) {
             if (!r.record_date) return false;
             var parts = String(r.record_date).split('T')[0].split('-');
@@ -711,7 +733,6 @@
         }
         html += '</tr></thead><tbody>';
 
-        // โครงสร้างคำถามและตัวเลือก (ตัดคอลัมน์ตัวอย่างออก และคำนวณ Span คงที่)
         var questions = [
             {
                 title: 'เวลาที่ปวดศีรษะ',
@@ -820,14 +841,11 @@
         questions.forEach(function(q) {
             q.options.forEach(function(opt, optIdx) {
                 html += '<tr>';
-                // คอลัมน์ที่ 1: หัวข้อหลัก
                 if (optIdx === 0) {
                     html += '<td class="col-head" rowspan="' + q.options.length + '">' + q.title + '</td>';
                 }
-                // คอลัมน์ที่ 2: ตัวเลือก
                 html += '<td class="col-sub">' + (opt.label || '') + '</td>';
 
-                // คอลัมน์วันที่ 1 ถึง 31
                 for (var i = 1; i <= daysInMonth; i++) {
                     var recordsForDay = filteredData.filter(function(r) {
                         var parts = String(r.record_date).split('T')[0].split('-');
@@ -865,26 +883,33 @@
         document.getElementById('tableMountPoint').innerHTML = html;
     }
 
-    // Export รูปภาพ JPG
+    // ข้อ 1: Export รูปภาพ JPG ทำงานเสถียร 100% ไม่ฟ้องติดไลบรารี
     function exportJPG() {
         var element = document.getElementById('reportRenderArea');
         var mSel = document.getElementById('monthSelect');
         var monthName = mSel.options[mSel.selectedIndex].text;
         var userName = (currentUser && currentUser.name) ? currentUser.name : 'User';
 
-        if (window.html2canvas) {
-            html2canvas(element, { scale: 2, useCORS: true, backgroundColor: '#ffffff' }).then(function(canvas) {
-                var link = document.createElement('a');
-                link.download = 'Headache_Diary_' + userName + '_' + monthName + '.jpg';
-                link.href = canvas.toDataURL('image/jpeg', 0.95);
-                link.click();
-            });
-        } else {
-            alert("ไลบรารีสร้างรูปภาพยังโหลดไม่เสร็จ กรุณารอสักครู่แล้วลองใหม่ครับ");
+        if (typeof window.html2canvas === 'undefined') {
+            alert("กำลังโหลดไลบรารีสร้างรูปภาพ กรุณารอสักครู่แล้วกดอีกครั้งครับ");
+            return;
         }
+
+        window.html2canvas(element, { 
+            scale: 2.5, 
+            useCORS: true, 
+            backgroundColor: '#ffffff' 
+        }).then(function(canvas) {
+            var link = document.createElement('a');
+            link.download = 'Headache_Diary_' + userName + '_' + monthName + '.jpg';
+            link.href = canvas.toDataURL('image/jpeg', 0.95);
+            link.click();
+        }).catch(function(err) {
+            alert("เกิดข้อผิดพลาดในการบันทึกภาพ: " + err.message);
+        });
     }
 
-    // Export PDF ให้จบใน 1 หน้า A4 แนวนอน
+    // ข้อ 2: Export PDF 1 หน้า A4 แนวนอน พร้อมแก้สระภาษาไทยไม่เพี้ยน
     function exportPDF() {
         var element = document.getElementById('reportRenderArea');
         var mSel = document.getElementById('monthSelect');
@@ -892,10 +917,10 @@
         var userName = (currentUser && currentUser.name) ? currentUser.name : 'User';
 
         var opt = {
-            margin:       [4, 4, 4, 4], // ระยะขอบ 4mm รอบด้าน
+            margin:       [3, 3, 3, 3], // ขอบกระดาษ 3mm ให้ฟิต 1 หน้า A4
             filename:     'Headache_Diary_' + userName + '_' + monthName + '.pdf',
             image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2, useCORS: true, letterRendering: true },
+            html2canvas:  { scale: 2.5, useCORS: true }, // ไม่ใส่ letterRendering: true ป้องกันสระภาษาไทยเพี้ยน
             jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' },
             pagebreak:    { mode: ['avoid-all'] }
         };
