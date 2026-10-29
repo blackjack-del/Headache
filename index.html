@@ -998,13 +998,18 @@
         }
     }
 
-    function loginGoogle() {
-        if (!window.supabaseClient) {
-            alert("ยังไม่ได้ตั้งค่าเชื่อมต่อฐานข้อมูล Supabase");
-            return;
-        }
-        window.supabaseClient.auth.signInWithOAuth({ provider: 'google' });
+function loginGoogle() {
+    if (!window.supabaseClient) {
+        alert("ยังไม่ได้ตั้งค่าเชื่อมต่อฐานข้อมูล Supabase");
+        return;
     }
+    window.supabaseClient.auth.signInWithOAuth({ 
+        provider: 'google',
+        options: {
+            redirectTo: window.location.origin
+        }
+    });
+}
     </script>
 </body>
 </html>
