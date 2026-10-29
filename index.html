@@ -4,9 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>บันทึกอาการปวดศีรษะ (Headache Diary)</title>
-    <!-- Supabase SDK -->
+    <!-- Supabase SDK & html2pdf -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- html2pdf สำหรับ Export PDF และ Image -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         :root {
@@ -23,19 +22,20 @@
         .container { max-width: 800px; margin: 0 auto; padding: 15px; }
         
         /* Auth UI */
-        #authSection { display: flex; min-height: 100vh; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 20px; }
-        .auth-card { background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); width: 100%; max-width: 400px; border: 1px solid var(--border); margin-bottom: 20px; }
+        #authSection { display: flex; min-height: 100vh; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 20px; box-sizing: border-box; }
+        .auth-card { background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); width: 100%; max-width: 400px; border: 1px solid var(--border); box-sizing: border-box; }
         .auth-card h3 { margin-top: 0; color: var(--primary); font-size: 18px; margin-bottom: 15px; }
         .auth-card select, .auth-card input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid var(--border); border-radius: 8px; font-size: 15px; box-sizing: border-box; }
         .btn-local { width: 100%; background: var(--primary); color: white; padding: 12px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }
         
         .divider { display: flex; align-items: center; text-align: center; margin: 15px 0; color: #94a3b8; font-size: 14px; }
         .divider::before, .divider::after { content: ''; flex: 1; border-bottom: 1px solid var(--border); }
-        .divider:not(:empty)::before { margin-right: .25em; }
-        .divider:not(:empty)::after { margin-left: .25em; }
+        .divider:not(:empty)::before { margin-right: .5em; }
+        .divider:not(:empty)::after { margin-left: .5em; }
         
-        .btn-google { width: 100%; background: #fff; color: #333; border: 1px solid #ccc; padding: 12px; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        
+        .btn-google { width: 100%; background: #fff; color: #333; border: 1px solid #ccc; padding: 12px; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .alert-error { display: none; background: #fee2e2; border: 1px solid #ef4444; color: #b91c1c; padding: 10px; border-radius: 6px; margin-bottom: 15px; font-size: 13px; text-align: left; }
+
         /* Nav & Profile */
         nav { background: var(--card); padding: 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
         .profile { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: bold; }
@@ -63,9 +63,8 @@
 
         .btn-submit { width: 100%; background: var(--primary); color: white; padding: 15px; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 10px; }
         
-        /* History & Modal CSS (เหมือนเดิม) */
+        /* History & Report */
         .history-item { padding: 15px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; background: #fff; }
-        .history-info { flex: 1; }
         .history-date { font-weight: bold; color: var(--primary); }
         .history-actions { display: flex; gap: 10px; }
         .btn-view { color: var(--primary); text-decoration: underline; background: none; border: none; cursor: pointer; font-weight: bold; }
@@ -78,23 +77,31 @@
         #reportTable th.col-sub { text-align: left; width: 80px; background: #f8fafc; word-wrap: break-word; }
         .red-dot { width: 10px; height: 10px; background-color: var(--dot-color); border-radius: 50%; margin: 0 auto; display: block; }
         .text-val { font-size: 9px; line-height: 1.1; }
-        .modal { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; padding: 15px; box-sizing: border-box;}
+        
+        /* Modal */
+        .modal { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; padding: 15px; box-sizing: border-box; }
         .modal.active { display: flex; }
         .modal-content { background: #fff; padding: 20px; border-radius: 10px; width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto; position: relative; }
         .close-modal { position: absolute; top: 15px; right: 15px; font-size: 20px; border: none; background: none; cursor: pointer; }
+        
+        @media (max-width: 768px) {
+            .grid-2 { grid-template-columns: 1fr; }
+        }
     </style>
 </head>
 <body>
 
-    <!-- Section Login -->
-    <div id="authSection" style="display: none;">
+    <!-- Section Login: แสดงผลเป็นค่าเริ่มต้น ไม่ใช้ display:none -->
+    <div id="authSection">
         <h1 style="color: var(--primary); margin-bottom: 10px;">🩺 Headache Diary</h1>
         <p style="margin-top: 0; color: #64748b; margin-bottom: 25px;">บันทึกประวัติอาการปวดศีรษะประจำวัน</p>
         
         <div class="auth-card">
+            <div id="errorBox" class="alert-error"></div>
+            
             <h3>เข้าสู่ระบบแบบระบุชื่อ</h3>
             <select id="existingUsers">
-                <option value="">-- เลือกชื่อผู้ใช้เดิม (ถ้ามี) --</option>
+                <option value="">-- เลือกชื่อผู้ใช้เดิม --</option>
             </select>
             <div class="divider">หรือ</div>
             <input type="text" id="newUserName" placeholder="พิมพ์ชื่อผู้ใช้ใหม่ที่นี่">
@@ -109,7 +116,7 @@
         </div>
     </div>
 
-    <!-- Section App -->
+    <!-- Section App: ซ่อนไว้จนกว่าจะ Login สำเร็จ -->
     <div id="appSection" style="display: none;">
         <nav>
             <div class="profile" id="userProfile">
@@ -125,7 +132,7 @@
         </nav>
 
         <div class="container">
-            <!-- แท็บกรอกข้อมูล -->
+            <!-- แท็บบันทึก -->
             <div id="inputTab" class="tab-content active">
                 <div class="card">
                     <h2>บันทึกอาการปวดศีรษะ</h2>
@@ -209,7 +216,7 @@
                         </div>
 
                         <div class="form-row">
-                            <label>ปวดอยู่นานเท่าใด (ระยะเวลา)</label>
+                            <label>ปวดอยู่นานเท่าใด</label>
                             <div style="display:flex; gap:10px;">
                                 <input type="number" id="dur_val" placeholder="ระบุตัวเลข" style="flex:2;">
                                 <select id="dur_unit" style="flex:1;">
@@ -245,15 +252,15 @@
                 </div>
             </div>
 
-            <!-- แท็บรายงาน (Export) -->
+            <!-- แท็บรายงาน -->
             <div id="exportTab" class="tab-content">
                 <div class="card">
                     <h2>ตารางรายงานสรุปรายเดือน</h2>
                     <div id="exportControls">
                         <select id="monthSelect" style="width: auto;"></select>
                         <select id="yearSelect" style="width: auto;"></select>
-                        <button class="btn-google" style="padding: 8px 16px; background:#4f46e5; color:white; border:none;" onclick="generateReport()">สร้างตาราง</button>
-                        <button class="btn-google" style="padding: 8px 16px; background:#ef4444; color:white; border:none;" onclick="exportPDF()">Export PDF</button>
+                        <button class="btn-local" style="width:auto; padding:8px 16px;" onclick="generateReport()">สร้างตาราง</button>
+                        <button class="btn-local" style="width:auto; padding:8px 16px; background:#ef4444;" onclick="exportPDF()">Export PDF</button>
                     </div>
                     
                     <div class="table-container" id="reportRenderArea"></div>
@@ -262,7 +269,7 @@
         </div>
     </div>
 
-    <!-- Modal ดูรายละเอียด -->
+    <!-- Modal รายละเอียด -->
     <div id="detailModal" class="modal">
         <div class="modal-content">
             <button class="close-modal" onclick="closeModal()">&times;</button>
@@ -272,28 +279,51 @@
     </div>
 
     <script>
-    // === 1. การตั้งค่า Supabase ===
-    const SUPABASE_URL = "https://zglonauqilgzbukygzwi.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpnbG9uYXVxaWxnemJ1a3lnendpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyMzA1MjgsImV4cCI6MjEwODgwNjUyOH0.vGCmTsz3lb42W0hXfZITSMhvwPw8JlbiPL9W2YCuu94";
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    
+    // === 1. ตรวจสอบค่าคอนฟิก Supabase ===
+    const RAW_URL = "วาง_PROJECT_URL_ของคุณที่นี่";
+    const RAW_KEY = "วาง_ANON_KEY_ของคุณที่นี่";
+
+    let supabase = null;
     let currentUser = null; 
     let recordsData = [];
 
-    // === 2. ระบบ Auth & Login ===
-    async function checkAuth() {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        // แบบที่ 1: ตรวจพบการ Login ผ่าน Google
-        if (session) {
-            currentUser = { 
-                id: session.user.id, 
-                name: session.user.user_metadata.full_name || session.user.email,
-                img: session.user.user_metadata.avatar_url 
-            };
-            showApp();
+    function showError(msg) {
+        const box = document.getElementById('errorBox');
+        if (box) {
+            box.style.display = 'block';
+            box.innerHTML = `⚠️ <strong>ตรวจพบข้อผิดพลาด:</strong><br>${msg}`;
+        }
+    }
+
+    // สร้าง Client อย่างปลอดภัย
+    try {
+        if (!window.supabase) {
+            showError("ไม่สามารถดาวน์โหลด Supabase SDK ได้ (กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต)");
+        } else if (RAW_URL.includes("วาง_") || !RAW_URL.startsWith("https://")) {
+            showError("กรุณาใส่ Supabase Project URL ให้ถูกต้องในโค้ด (ต้องขึ้นต้นด้วย https://)");
         } else {
-            // แบบที่ 2: ตรวจพบการระบุชื่อค้างไว้ในเครื่อง (Local Storage)
+            supabase = window.supabase.createClient(RAW_URL.trim(), RAW_KEY.trim());
+        }
+    } catch (e) {
+        showError("Supabase Config Error: " + e.message);
+    }
+
+    // === 2. Auth Flow ===
+    async function checkAuth() {
+        try {
+            if (supabase) {
+                const { data, error } = await supabase.auth.getSession();
+                if (data && data.session) {
+                    currentUser = { 
+                        id: data.session.user.id, 
+                        name: data.session.user.user_metadata.full_name || data.session.user.email,
+                        img: data.session.user.user_metadata.avatar_url 
+                    };
+                    showApp();
+                    return;
+                }
+            }
+
             const localUser = localStorage.getItem('localHeadacheUser');
             if (localUser) {
                 currentUser = { 
@@ -302,24 +332,31 @@
                     img: `https://ui-avatars.com/api/?name=${encodeURIComponent(localUser)}&background=random`
                 };
                 showApp();
-            } else {
-                // ยังไม่ได้ Login ให้แสดงหน้าเลือกชื่อ
-                document.getElementById('authSection').style.display = 'flex';
-                document.getElementById('appSection').style.display = 'none';
-                loadExistingUsers();
+                return;
             }
+
+            // ถ้าไม่มีใครล็อกอิน ให้โหลดชื่อเดิมมาใส่ Dropdown
+            loadExistingUsers();
+        } catch (err) {
+            console.warn("Auth check bypass:", err);
+            loadExistingUsers();
         }
     }
 
     async function loadExistingUsers() {
-        // ค้นหาชื่อที่มีอยู่แล้วในระบบมาใส่ Dropdown
-        const { data } = await supabase.from('headache_records').select('user_id');
-        if (data) {
-            const users = [...new Set(data.map(d => d.user_id))].filter(u => u && !u.includes('-'));
-            const sel = document.getElementById('existingUsers');
-            users.forEach(u => {
-                sel.innerHTML += `<option value="${u}">${u}</option>`;
-            });
+        if (!supabase) return;
+        try {
+            const { data } = await supabase.from('headache_records').select('user_id');
+            if (data) {
+                const users = [...new Set(data.map(d => d.user_id))].filter(u => u && !u.includes('-'));
+                const sel = document.getElementById('existingUsers');
+                sel.innerHTML = '<option value="">-- เลือกชื่อผู้ใช้เดิม --</option>';
+                users.forEach(u => {
+                    sel.innerHTML += `<option value="${u}">${u}</option>`;
+                });
+            }
+        } catch (e) {
+            console.error("Fetch users error:", e);
         }
     }
 
@@ -343,11 +380,19 @@
     }
 
     async function loginGoogle() {
-        await supabase.auth.signInWithOAuth({ provider: 'google' });
+        if (!supabase) {
+            alert("ไม่สามารถล็อกอิน Google ได้ เนื่องจากยังไม่ได้ตั้งค่า Supabase URL/Key");
+            return;
+        }
+        try {
+            await supabase.auth.signInWithOAuth({ provider: 'google' });
+        } catch (err) {
+            alert("เข้าสู่ระบบล้มเหลว: " + err.message);
+        }
     }
 
-    async function logout() {
-        await supabase.auth.signOut();
+    function logout() {
+        if (supabase) supabase.auth.signOut();
         localStorage.removeItem('localHeadacheUser');
         window.location.reload();
     }
@@ -362,15 +407,13 @@
         initReportSelects();
     }
 
-    document.addEventListener('DOMContentLoaded', checkAuth);
-
-    // === 3. UI Navigation ===
+    // === 3. ฟังก์ชันการทำงานของฟอร์ม ===
     function switchTab(tabId, btn) {
         document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         document.getElementById(tabId).classList.add('active');
         btn.classList.add('active');
-        if(tabId === 'exportTab') generateReport();
+        if (tabId === 'exportTab') generateReport();
     }
 
     function initFormDate() {
@@ -380,9 +423,12 @@
         document.getElementById('r_time').value = bkkTime.toTimeString().slice(0,5);
     }
 
-    // === 4. การบันทึกข้อมูล (Input) ===
     document.getElementById('recordForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (!supabase) {
+            alert("กรุณาตั้งค่า Supabase ให้เรียบร้อยก่อนบันทึกข้อมูล");
+            return;
+        }
         const btn = document.getElementById('saveBtn');
         btn.disabled = true; btn.innerText = "กำลังบันทึก...";
 
@@ -390,7 +436,7 @@
         const getRadio = (name) => { const el = document.querySelector(`input[name="${name}"]:checked`); return el ? el.value : null; };
 
         const payload = {
-            user_id: currentUser.id, // ส่งค่าชื่อที่เลือกหรือ Google ID
+            user_id: currentUser.id,
             record_date: document.getElementById('r_date').value,
             record_time: document.getElementById('r_time').value,
             aura: getChecked('aura'),
@@ -410,8 +456,9 @@
         };
 
         const { error } = await supabase.from('headache_records').insert([payload]);
-        if(error) { alert("เกิดข้อผิดพลาด: " + error.message); }
-        else { 
+        if(error) { 
+            alert("เกิดข้อผิดพลาดในการบันทึก: " + error.message); 
+        } else { 
             alert("บันทึกข้อมูลเรียบร้อยแล้ว"); 
             document.getElementById('recordForm').reset();
             initFormDate();
@@ -420,13 +467,14 @@
         btn.disabled = false; btn.innerText = "บันทึกข้อมูล";
     });
 
-    // === 5. ประวัติการบันทึก (History) ===
+    // === 4. โหลดประวัติและลบ ===
     async function loadHistory() {
-        // กรองแสดงเฉพาะข้อมูลของชื่อผู้ใช้ที่กำลัง Login อยู่ (.eq)
+        if (!supabase) return;
         const { data, error } = await supabase.from('headache_records')
             .select('*')
             .eq('user_id', currentUser.id)
-            .order('record_date', { ascending: false }).order('record_time', { ascending: false });
+            .order('record_date', { ascending: false })
+            .order('record_time', { ascending: false });
             
         if(error) return;
         recordsData = data;
@@ -486,7 +534,7 @@
         if(document.getElementById('exportTab').classList.contains('active')) generateReport();
     }
 
-    // === 6. ตารางรายงาน (Export) ===
+    // === 5. ตารางรายงานและ Export PDF ===
     function initReportSelects() {
         const mSel = document.getElementById('monthSelect');
         const ySel = document.getElementById('yearSelect');
@@ -517,6 +565,7 @@
         
         let html = '<table id="reportTable"><thead>';
         
+        // แถว วัน จ-อ
         html += '<tr><th colspan="2" class="col-head"></th>';
         for(let i=1; i<=daysInMonth; i++) {
             let dayText = '';
@@ -528,6 +577,7 @@
         }
         html += '</tr>';
 
+        // แถว วันที่
         html += '<tr><th class="col-head" colspan="2">วันที่</th>';
         for(let i=1; i<=daysInMonth; i++) html += `<th>${i}</th>`;
         html += '</tr></thead><tbody>';
@@ -603,6 +653,9 @@
         };
         html2pdf().set(opt).from(element).save();
     }
+
+    // เริ่มต้นระบบ
+    document.addEventListener('DOMContentLoaded', checkAuth);
     </script>
 </body>
 </html>
