@@ -91,7 +91,7 @@
 </head>
 <body>
 
-    <!-- Section Login: แสดงผลเป็นค่าเริ่มต้น ไม่ใช้ display:none -->
+    <!-- Section Login -->
     <div id="authSection">
         <h1 style="color: var(--primary); margin-bottom: 10px;">🩺 Headache Diary</h1>
         <p style="margin-top: 0; color: #64748b; margin-bottom: 25px;">บันทึกประวัติอาการปวดศีรษะประจำวัน</p>
@@ -105,29 +105,29 @@
             </select>
             <div class="divider">หรือ</div>
             <input type="text" id="newUserName" placeholder="พิมพ์ชื่อผู้ใช้ใหม่ที่นี่">
-            <button class="btn-local" onclick="loginLocal()">เข้าสู่ระบบ</button>
+            <button type="button" class="btn-local" onclick="loginLocal()">เข้าสู่ระบบ</button>
             
             <div class="divider">ตัวเลือกเสริม</div>
             
-            <button class="btn-google" onclick="loginGoogle()">
+            <button type="button" class="btn-google" onclick="loginGoogle()">
                 <img src="https://www.svgrepo.com/show/475656/google-color.svg" width="20" alt="Google">
                 เข้าสู่ระบบด้วย Google
             </button>
         </div>
     </div>
 
-    <!-- Section App: ซ่อนไว้จนกว่าจะ Login สำเร็จ -->
+    <!-- Section App -->
     <div id="appSection" style="display: none;">
         <nav>
             <div class="profile" id="userProfile">
                 <img id="userImg" src="" alt="">
                 <span id="userName">User</span>
-                <button class="btn-logout" onclick="logout()">ออกจากระบบ</button>
+                <button class="btn-logout" type="button" onclick="logout()">ออกจากระบบ</button>
             </div>
             <div class="tabs">
-                <button class="tab-btn active" onclick="switchTab('inputTab', this)">📝 บันทึก</button>
-                <button class="tab-btn" onclick="switchTab('historyTab', this)">🕒 ประวัติ</button>
-                <button class="tab-btn" onclick="switchTab('exportTab', this)">📊 ตารางรายงาน</button>
+                <button class="tab-btn active" type="button" onclick="switchTab('inputTab', this)">📝 บันทึก</button>
+                <button class="tab-btn" type="button" onclick="switchTab('historyTab', this)">🕒 ประวัติ</button>
+                <button class="tab-btn" type="button" onclick="switchTab('exportTab', this)">📊 ตารางรายงาน</button>
             </div>
         </nav>
 
@@ -259,8 +259,8 @@
                     <div id="exportControls">
                         <select id="monthSelect" style="width: auto;"></select>
                         <select id="yearSelect" style="width: auto;"></select>
-                        <button class="btn-local" style="width:auto; padding:8px 16px;" onclick="generateReport()">สร้างตาราง</button>
-                        <button class="btn-local" style="width:auto; padding:8px 16px; background:#ef4444;" onclick="exportPDF()">Export PDF</button>
+                        <button class="btn-local" type="button" style="width:auto; padding:8px 16px;" onclick="generateReport()">สร้างตาราง</button>
+                        <button class="btn-local" type="button" style="width:auto; padding:8px 16px; background:#ef4444;" onclick="exportPDF()">Export PDF</button>
                     </div>
                     
                     <div class="table-container" id="reportRenderArea"></div>
@@ -272,14 +272,20 @@
     <!-- Modal รายละเอียด -->
     <div id="detailModal" class="modal">
         <div class="modal-content">
-            <button class="close-modal" onclick="closeModal()">&times;</button>
+            <button class="close-modal" type="button" onclick="closeModal()">&times;</button>
             <h2 id="m_datetime"></h2>
             <div id="m_body" style="line-height: 1.6; font-size:15px;"></div>
         </div>
     </div>
 
     <script>
-    // === 1. ตรวจสอบค่าคอนฟิก Supabase ===
+    // ดักจับ Error แสดงแจ้งเตือนบนจอมือถือทันที
+    window.onerror = function(msg, url, lineNo) {
+        alert("ตรวจพบข้อผิดพลาด:\n" + msg + "\n(บรรทัดที่: " + lineNo + ")");
+        return false;
+    };
+
+// === 1. ตรวจสอบค่าคอนฟิก Supabase ===
     const SUPABASE_URL = "https://zglonauqilgzbukygzwi.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpnbG9uYXVxaWxnemJ1a3lnendpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyMzA1MjgsImV4cCI6MjEwODgwNjUyOH0.vGCmTsz3lb42W0hXfZITSMhvwPw8JlbiPL9W2YCuu94";
 
@@ -295,24 +301,22 @@
         }
     }
 
-    // สร้าง Client อย่างปลอดภัย
     try {
         if (!window.supabase) {
-            showError("ไม่สามารถดาวน์โหลด Supabase SDK ได้ (กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต)");
+            showError("ไม่สามารถดาวน์โหลด Supabase SDK ได้ กรุณาเช็กการเชื่อมต่ออินเทอร์เน็ต");
         } else if (RAW_URL.includes("วาง_") || !RAW_URL.startsWith("https://")) {
-            showError("กรุณาใส่ Supabase Project URL ให้ถูกต้องในโค้ด (ต้องขึ้นต้นด้วย https://)");
+            showError("กรุณาใส่ Supabase Project URL ให้ถูกต้อง (ขึ้นต้นด้วย https://)");
         } else {
-            supabase = window.supabase.createClient(RAW_URL.trim(), RAW_KEY.trim());
+            supabase = window.supabase.createClient(RAW_URL, RAW_KEY);
         }
     } catch (e) {
         showError("Supabase Config Error: " + e.message);
     }
 
-    // === 2. Auth Flow ===
     async function checkAuth() {
         try {
             if (supabase) {
-                const { data, error } = await supabase.auth.getSession();
+                const { data } = await supabase.auth.getSession();
                 if (data && data.session) {
                     currentUser = { 
                         id: data.session.user.id, 
@@ -324,7 +328,11 @@
                 }
             }
 
-            const localUser = localStorage.getItem('localHeadacheUser');
+            let localUser = null;
+            try {
+                localUser = localStorage.getItem('localHeadacheUser');
+            } catch(e) {}
+
             if (localUser) {
                 currentUser = { 
                     id: localUser, 
@@ -335,10 +343,8 @@
                 return;
             }
 
-            // ถ้าไม่มีใครล็อกอิน ให้โหลดชื่อเดิมมาใส่ Dropdown
             loadExistingUsers();
         } catch (err) {
-            console.warn("Auth check bypass:", err);
             loadExistingUsers();
         }
     }
@@ -355,28 +361,39 @@
                     sel.innerHTML += `<option value="${u}">${u}</option>`;
                 });
             }
-        } catch (e) {
-            console.error("Fetch users error:", e);
-        }
+        } catch (e) {}
     }
 
     function loginLocal() {
-        const existing = document.getElementById('existingUsers').value;
-        const newName = document.getElementById('newUserName').value.trim();
-        const finalName = newName || existing;
-        
-        if (!finalName) {
-            alert('กรุณาพิมพ์ชื่อใหม่ หรือเลือกชื่อที่มีอยู่จากรายการ');
-            return;
+        try {
+            const existingEl = document.getElementById('existingUsers');
+            const newNameEl = document.getElementById('newUserName');
+            
+            const existing = existingEl ? existingEl.value : '';
+            const newName = newNameEl ? newNameEl.value.trim() : '';
+            const finalName = newName || existing;
+            
+            if (!finalName) {
+                alert('กรุณาพิมพ์ชื่อใหม่ หรือเลือกชื่อที่มีอยู่จากรายการ');
+                return;
+            }
+            
+            try {
+                localStorage.setItem('localHeadacheUser', finalName);
+            } catch (e) {
+                console.warn("ไม่สามารถเซฟลง LocalStorage ได้");
+            }
+            
+            currentUser = { 
+                id: finalName, 
+                name: finalName,
+                img: `https://ui-avatars.com/api/?name=${encodeURIComponent(finalName)}&background=random`
+            };
+            
+            showApp();
+        } catch (err) {
+            alert("เกิดข้อผิดพลาดในการเข้าสู่ระบบ: " + err.message);
         }
-        
-        localStorage.setItem('localHeadacheUser', finalName);
-        currentUser = { 
-            id: finalName, 
-            name: finalName,
-            img: `https://ui-avatars.com/api/?name=${encodeURIComponent(finalName)}&background=random`
-        };
-        showApp();
     }
 
     async function loginGoogle() {
@@ -392,22 +409,31 @@
     }
 
     function logout() {
-        if (supabase) supabase.auth.signOut();
-        localStorage.removeItem('localHeadacheUser');
+        if (supabase) {
+            try { supabase.auth.signOut(); } catch(e){}
+        }
+        try { localStorage.removeItem('localHeadacheUser'); } catch(e){}
         window.location.reload();
     }
 
     function showApp() {
-        document.getElementById('authSection').style.display = 'none';
-        document.getElementById('appSection').style.display = 'block';
-        document.getElementById('userName').innerText = currentUser.name;
-        document.getElementById('userImg').src = currentUser.img || 'https://via.placeholder.com/32';
-        initFormDate();
-        loadHistory();
-        initReportSelects();
+        const auth = document.getElementById('authSection');
+        const app = document.getElementById('appSection');
+        if (auth) auth.style.display = 'none';
+        if (app) app.style.display = 'block';
+        
+        if (currentUser) {
+            const nameEl = document.getElementById('userName');
+            const imgEl = document.getElementById('userImg');
+            if (nameEl) nameEl.innerText = currentUser.name;
+            if (imgEl) imgEl.src = currentUser.img || 'https://via.placeholder.com/32';
+        }
+        
+        try { initFormDate(); } catch (e) {}
+        try { loadHistory(); } catch (e) {}
+        try { initReportSelects(); } catch (e) {}
     }
 
-    // === 3. ฟังก์ชันการทำงานของฟอร์ม ===
     function switchTab(tabId, btn) {
         document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -416,11 +442,24 @@
         if (tabId === 'exportTab') generateReport();
     }
 
+    // คำนวณเวลาท้องถิ่นไทย (UTC+7) รองรับ iOS/Safari และอุปกรณ์ทุกรุ่น
     function initFormDate() {
-        const now = new Date();
-        const bkkTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Bangkok"}));
-        document.getElementById('r_date').value = bkkTime.toISOString().split('T')[0];
-        document.getElementById('r_time').value = bkkTime.toTimeString().slice(0,5);
+        try {
+            const now = new Date();
+            const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
+            const bkkDate = new Date(utcTime + (7 * 3600000));
+            
+            const yyyy = bkkDate.getFullYear();
+            const mm = String(bkkDate.getMonth() + 1).padStart(2, '0');
+            const dd = String(bkkDate.getDate()).padStart(2, '0');
+            const hh = String(bkkDate.getHours()).padStart(2, '0');
+            const min = String(bkkDate.getMinutes()).padStart(2, '0');
+            
+            const dInput = document.getElementById('r_date');
+            const tInput = document.getElementById('r_time');
+            if (dInput) dInput.value = `${yyyy}-${mm}-${dd}`;
+            if (tInput) tInput.value = `${hh}:${min}`;
+        } catch (e) {}
     }
 
     document.getElementById('recordForm').addEventListener('submit', async (e) => {
@@ -467,9 +506,8 @@
         btn.disabled = false; btn.innerText = "บันทึกข้อมูล";
     });
 
-    // === 4. โหลดประวัติและลบ ===
     async function loadHistory() {
-        if (!supabase) return;
+        if (!supabase || !currentUser) return;
         const { data, error } = await supabase.from('headache_records')
             .select('*')
             .eq('user_id', currentUser.id)
@@ -480,6 +518,7 @@
         recordsData = data;
         
         const list = document.getElementById('historyList');
+        if(!list) return;
         if(data.length === 0) { list.innerHTML = "<p>ยังไม่มีประวัติการบันทึกของคุณ</p>"; return; }
 
         list.innerHTML = data.map((item, idx) => `
@@ -489,16 +528,20 @@
                     <div style="font-size:13px; color:#666; margin-top:4px;">ระดับ: ${item.severity || '-'}</div>
                 </div>
                 <div class="history-actions">
-                    <button class="btn-view" onclick="viewDetail(${idx})">ดูรายละเอียด</button>
-                    <button class="btn-del" onclick="deleteRecord('${item.id}')">ลบ</button>
+                    <button class="btn-view" type="button" onclick="viewDetail(${idx})">ดูรายละเอียด</button>
+                    <button class="btn-del" type="button" onclick="deleteRecord('${item.id}')">ลบ</button>
                 </div>
             </div>
         `).join('');
     }
 
     function formatDate(dateStr) {
-        const d = new Date(dateStr);
-        return `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()+543}`;
+        if (!dateStr) return '';
+        const parts = dateStr.split('-');
+        if (parts.length === 3) {
+            return `${parseInt(parts[2])}/${parseInt(parts[1])}/${parseInt(parts[0]) + 543}`;
+        }
+        return dateStr;
     }
 
     function viewDetail(idx) {
@@ -534,15 +577,17 @@
         if(document.getElementById('exportTab').classList.contains('active')) generateReport();
     }
 
-    // === 5. ตารางรายงานและ Export PDF ===
     function initReportSelects() {
         const mSel = document.getElementById('monthSelect');
         const ySel = document.getElementById('yearSelect');
+        if (!mSel || !ySel) return;
+        
         const thMonths = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
         
         mSel.innerHTML = '<option value="all">-- ทุกเดือน --</option>' + thMonths.map((m, i) => `<option value="${i}">${m}</option>`).join('');
         
         const currYear = new Date().getFullYear();
+        ySel.innerHTML = '';
         for(let i = currYear; i >= currYear - 5; i--) {
             ySel.innerHTML += `<option value="${i}">${i + 543}</option>`;
         }
@@ -556,7 +601,7 @@
         let filteredData = recordsData.filter(r => r.record_date.startsWith(y.toString()));
         if(mStr !== 'all') {
             const m = parseInt(mStr) + 1;
-            const mPrefix = m < 10 ? '0'+m : m;
+            const mPrefix = m < 10 ? '0'+m : String(m);
             filteredData = filteredData.filter(r => r.record_date.split('-')[1] === mPrefix);
         }
 
@@ -565,7 +610,6 @@
         
         let html = '<table id="reportTable"><thead>';
         
-        // แถว วัน จ-อ
         html += '<tr><th colspan="2" class="col-head"></th>';
         for(let i=1; i<=daysInMonth; i++) {
             let dayText = '';
@@ -577,24 +621,23 @@
         }
         html += '</tr>';
 
-        // แถว วันที่
         html += '<tr><th class="col-head" colspan="2">วันที่</th>';
         for(let i=1; i<=daysInMonth; i++) html += `<th>${i}</th>`;
         html += '</tr></thead><tbody>';
 
         const rows = [
             { label: 'เวลาที่ปวดศีรษะ', sub: '', field: 'time' },
-            { label: 'อาการที่เกิดขึ้นนำมา<br>ก่อนอาการปวดศีรษะ', sub: 'เห็นแสง', check: (r) => r.aura?.includes('เห็นแสง') },
-            { label: '', sub: 'มีอาการอื่น', check: (r) => r.aura?.includes('มีอาการอื่น') },
-            { label: 'ตำแหน่งที่ปวด', sub: 'ซ้าย', check: (r) => r.location?.includes('ซ้าย') },
-            { label: '', sub: 'ขวา', check: (r) => r.location?.includes('ขวา') },
-            { label: '', sub: 'ทั้ง 2 ข้าง', check: (r) => r.location?.includes('ทั้ง 2 ข้าง') },
-            { label: 'ลักษณะที่ปวด', sub: 'ตุบๆ', check: (r) => r.pain_character?.includes('ตุบๆ') },
-            { label: '', sub: 'กดบีบ', check: (r) => r.pain_character?.includes('กดบีบ') },
-            { label: '', sub: 'แหลมปรี๊ด', check: (r) => r.pain_character?.includes('แหลมปรี๊ด') },
-            { label: 'ความรุนแรง', sub: 'เล็กน้อย ถึง<br>ทำงานต่อได้', check: (r) => r.severity?.includes('เล็กน้อย') },
-            { label: '', sub: 'ปานกลาง<br>ทำงานได้ลดลง', check: (r) => r.severity?.includes('ปานกลาง') },
-            { label: '', sub: 'รุนแรง ทำงาน<br>ต่อไม่ได้', check: (r) => r.severity?.includes('รุนแรง') },
+            { label: 'อาการที่เกิดขึ้นนำมา<br>ก่อนอาการปวดศีรษะ', sub: 'เห็นแสง', check: (r) => r.aura && r.aura.includes('เห็นแสง') },
+            { label: '', sub: 'มีอาการอื่น', check: (r) => r.aura && r.aura.includes('มีอาการอื่น') },
+            { label: 'ตำแหน่งที่ปวด', sub: 'ซ้าย', check: (r) => r.location && r.location.includes('ซ้าย') },
+            { label: '', sub: 'ขวา', check: (r) => r.location && r.location.includes('ขวา') },
+            { label: '', sub: 'ทั้ง 2 ข้าง', check: (r) => r.location && r.location.includes('ทั้ง 2 ข้าง') },
+            { label: 'ลักษณะที่ปวด', sub: 'ตุบๆ', check: (r) => r.pain_character && r.pain_character.includes('ตุบๆ') },
+            { label: '', sub: 'กดบีบ', check: (r) => r.pain_character && r.pain_character.includes('กดบีบ') },
+            { label: '', sub: 'แหลมปรี๊ด', check: (r) => r.pain_character && r.pain_character.includes('แหลมปรี๊ด') },
+            { label: 'ความรุนแรง', sub: 'เล็กน้อย ถึง<br>ทำงานต่อได้', check: (r) => r.severity && r.severity.includes('เล็กน้อย') },
+            { label: '', sub: 'ปานกลาง<br>ทำงานได้ลดลง', check: (r) => r.severity && r.severity.includes('ปานกลาง') },
+            { label: '', sub: 'รุนแรง ทำงาน<br>ต่อไม่ได้', check: (r) => r.severity && r.severity.includes('รุนแรง') },
             { label: 'อาการปวดแย่ลงเมื่อ<br>เคลื่อนไหว/ออกแรง', sub: 'แย่ลง', check: (r) => r.worsen_movement === 'แย่ลง' },
             { label: '', sub: 'ไม่เปลี่ยนแปลง', check: (r) => r.worsen_movement === 'ไม่เปลี่ยนแปลง' },
             { label: 'มีคลื่นไส้ร่วมด้วย<br>หรือไม่', sub: 'มี', check: (r) => r.nausea === 'มี' },
@@ -618,8 +661,8 @@
             for(let i=1; i<=daysInMonth; i++) {
                 const recordsForDay = filteredData.filter(r => {
                     if (mStr === 'all') return parseInt(r.record_date.split('-')[2]) === i;
-                    const d = new Date(r.record_date);
-                    return d.getDate() === i && d.getMonth() === parseInt(mStr);
+                    const parts = r.record_date.split('-');
+                    return parseInt(parts[2]) === i && (parseInt(parts[1]) - 1) === parseInt(mStr);
                 });
 
                 let cellContent = '';
@@ -654,7 +697,6 @@
         html2pdf().set(opt).from(element).save();
     }
 
-    // เริ่มต้นระบบ
     document.addEventListener('DOMContentLoaded', checkAuth);
     </script>
 </body>
