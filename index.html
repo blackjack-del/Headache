@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>บันทึกอาการปวดศีรษะ (Headache Diary)</title>
 
-    <!-- html2pdf สำหรับ Export PDF -->
+    <!-- html2pdf & html2canvas bundle สำหรับ Export PDF และ JPG -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <style>
@@ -16,7 +16,7 @@
             --text: #1e293b;
             --border: #e2e8f0;
             --danger: #ef4444;
-            --dot-color: #f87171;
+            --dot-color: #ef4444;
         }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; }
         .container { max-width: 800px; margin: 0 auto; padding: 15px; }
@@ -65,17 +65,73 @@
         .btn-view { color: var(--primary); text-decoration: underline; background: none; border: none; cursor: pointer; font-weight: bold; }
         .btn-del { color: var(--danger); background: none; border: none; cursor: pointer; }
 
-        /* Report Table Styling */
+        /* Report Table Styling (ปรับกระชับให้พอดี 1 หน้า A4 แนวนอน) */
         .table-container { overflow-x: auto; background: #fff; border: 1px solid var(--border); padding: 10px; }
-        #reportTable { border-collapse: collapse; width: 100%; min-width: 1000px; font-size: 11px; table-layout: fixed; background: #fff; }
-        #reportTable th, #reportTable td { border: 1px solid #334155; padding: 3px 2px; text-align: center; vertical-align: middle; }
-        #reportTable th.col-head, #reportTable td.col-head { text-align: left; width: 125px; background: #f8fafc; font-weight: bold; padding-left: 5px; }
-        #reportTable th.col-sub, #reportTable td.col-sub { text-align: left; width: 95px; background: #ffffff; padding-left: 4px; }
-        #reportTable th.col-example, #reportTable td.col-example { width: 45px; background: #f1f5f9; color: #475569; font-size: 10px; }
         
-        .example-box { display: inline-block; width: 11px; height: 11px; border: 1px solid #64748b; border-radius: 1px; background: #fff; }
-        .red-dot { width: 10px; height: 10px; background-color: var(--dot-color); border: 1px solid #dc2626; border-radius: 50%; margin: 0 auto; display: block; }
-        .text-val { font-size: 9px; line-height: 1.1; word-break: break-word; }
+        #reportRenderArea {
+            position: relative;
+            background: #ffffff;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+
+        /* ลายน้ำชื่อผู้ใช้ */
+        .watermark {
+            position: absolute;
+            top: 55%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-12deg);
+            font-size: 68px;
+            font-weight: 800;
+            color: rgba(79, 70, 229, 0.04);
+            pointer-events: none;
+            white-space: nowrap;
+            z-index: 1;
+            user-select: none;
+        }
+
+        #reportTable { 
+            border-collapse: collapse; 
+            width: 100%; 
+            min-width: 960px; 
+            font-size: 9.5px; 
+            table-layout: fixed; 
+            background: transparent;
+            position: relative;
+            z-index: 2;
+        }
+        #reportTable th, #reportTable td { 
+            border: 1px solid #475569; 
+            padding: 1.5px 1px; 
+            text-align: center; 
+            vertical-align: middle; 
+            line-height: 1.1;
+        }
+        #reportTable th.col-head, #reportTable td.col-head { 
+            text-align: left; 
+            width: 145px; 
+            background: #f8fafc; 
+            font-weight: bold; 
+            padding-left: 4px;
+            word-wrap: break-word;
+        }
+        #reportTable th.col-sub, #reportTable td.col-sub { 
+            text-align: left; 
+            width: 85px; 
+            background: #ffffff; 
+            padding-left: 3px;
+            word-wrap: break-word;
+        }
+        
+        .red-dot { 
+            width: 8px; 
+            height: 8px; 
+            background-color: var(--dot-color); 
+            border-radius: 50%; 
+            margin: 0 auto; 
+            display: block; 
+        }
+        .text-val { font-size: 8px; line-height: 1.05; word-break: break-word; }
 
         .modal { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; padding: 15px; box-sizing: border-box; }
         .modal.active { display: flex; }
@@ -199,6 +255,7 @@
                 <option value="">-- เลือกชื่อเดิมในระบบ --</option>
             </select>
             <div class="divider">หรือพิมพ์ชื่อใหม่</div>
+            <!-- ข้อ 4: เปลี่ยนตัวอย่างเป็น สมชาย -->
             <input type="text" id="newUserName" placeholder="ใส่ชื่อของคุณ เช่น สมชาย">
             <button type="button" class="btn-local" onclick="handleLoginClick()">เข้าสู่ระบบ</button>
             
@@ -237,23 +294,23 @@
                             <div style="flex:1;"><label>เวลา</label><input type="time" id="r_time" required></div>
                         </div>
 
-                        <!-- 1 & 2. อาการนำมาก่อน (ตัด Aura และมี Textbox เมื่อเลือกมีอาการอื่น) -->
+                        <!-- ข้อ 1 & 2: ตัด Aura ออก และมี Textbox เมื่อเลือกมีอาการอื่น -->
                         <div class="form-row">
                             <label>อาการนำมาก่อน</label>
                             <div class="options-group">
                                 <label class="option-label"><input type="checkbox" name="aura" value="เห็นแสง"> เห็นแสง</label>
                                 <label class="option-label"><input type="checkbox" name="aura" id="auraOtherCb" value="มีอาการอื่น" onchange="toggleAuraOther()"> มีอาการอื่น</label>
                                 <div id="auraOtherWrapper" style="display: none; margin-top: 5px; padding-left: 26px;">
-                                    <input type="text" id="auraOtherText" placeholder="ระบุอาการอื่น เช่น ตาพร่ามัว, แขนขาชา">
+                                    <input type="text" id="auraOtherText" placeholder="ระบุอาการอื่น เช่น ตาพร่ามัว, ชาครึ่งซีก">
                                 </div>
                             </div>
                         </div>
 
-                        <!-- 3. ตำแหน่งที่ปวดเป็น Radio button -->
+                        <!-- ข้อ 3: ตำแหน่งที่ปวดเป็น Radio button ทั้งหมด -->
                         <div class="form-row">
                             <label>ตำแหน่งที่ปวด</label>
                             <div class="options-group">
-                                <label class="option-label"><input type="radio" name="loc" value="ซ้าย"> ซ้าย</label>
+                                <label class="option-label"><input type="radio" name="loc" value="ซ้าย" required> ซ้าย</label>
                                 <label class="option-label"><input type="radio" name="loc" value="ขวา"> ขวา</label>
                                 <label class="option-label"><input type="radio" name="loc" value="ทั้ง 2 ข้าง"> ทั้ง 2 ข้าง</label>
                             </div>
@@ -269,7 +326,7 @@
                         </div>
 
                         <div class="form-row">
-                            <label>ความรุนแรง</label>
+                            <label>ความรุนแรงของอาการปวด</label>
                             <div class="options-group">
                                 <label class="option-label"><input type="radio" name="severity" value="เล็กน้อย ถึง ทำงานต่อได้"> เล็กน้อย (ทำงานต่อได้)</label>
                                 <label class="option-label"><input type="radio" name="severity" value="ปานกลาง ทำงานได้ลดลง"> ปานกลาง (ทำงานได้ลดลง)</label>
@@ -279,35 +336,35 @@
 
                         <div class="grid-2">
                             <div class="form-row">
-                                <label>แย่ลงเมื่อเคลื่อนไหว?</label>
+                                <label>แย่ลงเมื่อเคลื่อนไหวหรือออกแรง?</label>
                                 <div class="options-group">
                                     <label class="option-label"><input type="radio" name="movement" value="แย่ลง"> แย่ลง</label>
                                     <label class="option-label"><input type="radio" name="movement" value="ไม่เปลี่ยนแปลง"> ไม่เปลี่ยน</label>
                                 </div>
                             </div>
                             <div class="form-row">
-                                <label>คลื่นไส้?</label>
+                                <label>มีคลื่นไส้ร่วมด้วยหรือไม่?</label>
                                 <div class="options-group">
                                     <label class="option-label"><input type="radio" name="nausea" value="มี"> มี</label>
                                     <label class="option-label"><input type="radio" name="nausea" value="ไม่มี"> ไม่มี</label>
                                 </div>
                             </div>
                             <div class="form-row">
-                                <label>ตาแดง น้ำตา น้ำมูก?</label>
+                                <label>มีตาแดง น้ำตา น้ำมูกไหลร่วมด้วย?</label>
                                 <div class="options-group">
                                     <label class="option-label"><input type="radio" name="auto" value="มี"> มี</label>
                                     <label class="option-label"><input type="radio" name="auto" value="ไม่มี"> ไม่มี</label>
                                 </div>
                             </div>
                             <div class="form-row">
-                                <label>แย่ลงเมื่อมีแสงจ้า?</label>
+                                <label>แย่ลงเมื่อมีแสงจ้าๆ?</label>
                                 <div class="options-group">
                                     <label class="option-label"><input type="radio" name="light" value="แย่ลง"> แย่ลง</label>
                                     <label class="option-label"><input type="radio" name="light" value="ไม่เปลี่ยนแปลง"> ไม่เปลี่ยน</label>
                                 </div>
                             </div>
                             <div class="form-row">
-                                <label>แย่ลงเมื่อมีเสียงดัง?</label>
+                                <label>แย่ลงเมื่อได้ยินเสียงดังๆ?</label>
                                 <div class="options-group">
                                     <label class="option-label"><input type="radio" name="noise" value="แย่ลง"> แย่ลง</label>
                                     <label class="option-label"><input type="radio" name="noise" value="ไม่เปลี่ยนแปลง"> ไม่เปลี่ยน</label>
@@ -328,7 +385,7 @@
 
                         <div class="form-row">
                             <label>สิ่งกระตุ้นอาการปวด</label>
-                            <input type="text" id="triggers" placeholder="เช่น อดนอน, เครียด">
+                            <input type="text" id="triggers" placeholder="เช่น อดนอน, เครียด, กาแฟ">
                         </div>
 
                         <div class="form-row">
@@ -356,14 +413,33 @@
             <div id="exportTab" class="tab-content">
                 <div class="card">
                     <h2>ตารางรายงานประจำเดือน</h2>
-                    <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
-                        <select id="monthSelect" style="width: auto;"></select>
-                        <select id="yearSelect" style="width: auto;"></select>
-                        <button class="btn-local" type="button" style="width:auto; padding:8px 16px;" onclick="generateReport()">สร้างตาราง</button>
-                        <button class="btn-local" type="button" style="width:auto; padding:8px 16px; background:#ef4444;" onclick="exportPDF()">Export PDF</button>
+                    <!-- ตัวเลือกเดือน/ปี และปุ่ม Export -->
+                    <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; align-items: center;">
+                        <select id="monthSelect" style="width: auto;" onchange="generateReport()"></select>
+                        <select id="yearSelect" style="width: auto;" onchange="generateReport()"></select>
+                        <!-- ข้อ 3: ปุ่ม Export JPG และ PDF -->
+                        <button class="btn-local" type="button" style="width:auto; padding:8px 16px; background:#0284c7;" onclick="exportJPG()">🖼️ Export รูปภาพ (JPG)</button>
+                        <button class="btn-local" type="button" style="width:auto; padding:8px 16px; background:#ef4444;" onclick="exportPDF()">📄 Export PDF (1 หน้า)</button>
                     </div>
                     
-                    <div class="table-container" id="reportRenderArea"></div>
+                    <div class="table-container">
+                        <!-- พื้นที่เรนเดอร์ที่จะนำไปทำภาพ/PDF พร้อมลายน้ำชื่อ -->
+                        <div id="reportRenderArea">
+                            <div id="watermarkEl" class="watermark"></div>
+                            <div id="reportHeader" style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:4px; padding-bottom:3px; border-bottom:1.5px solid #4f46e5; position:relative; z-index:2;">
+                                <div>
+                                    <span style="font-size:13px; font-weight:bold; color:#4f46e5;">🩺 แบบบันทึกอาการปวดศีรษะ (Headache Diary)</span>
+                                    <span style="font-size:11px; margin-left:12px; color:#1e293b; background:#e0e7ff; padding:2px 8px; border-radius:4px; font-weight:bold;">
+                                        👤 ผู้บันทึก: <span id="reportUserName">-</span>
+                                    </span>
+                                </div>
+                                <div style="font-size:11px; font-weight:bold; color:#475569;">
+                                    <span>ประจำเดือน: <span id="reportMonthYear">-</span></span>
+                                </div>
+                            </div>
+                            <div id="tableMountPoint"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -419,7 +495,6 @@
     }
     loadExistingUsersList();
 
-    // ตัวช่วยตรวจสอบค่าว่ามีในอาเรย์หรือข้อความหรือไม่
     function hasVal(field, val) {
         if (!field) return false;
         if (Array.isArray(field)) {
@@ -539,15 +614,15 @@
         function a(label, arr) { return '<div><strong>' + label + ':</strong> ' + (arr && arr.length > 0 ? arr.join(', ') : '-') + '</div>'; }
 
         document.getElementById('m_body').innerHTML = 
-            a('อาการนำ', item.aura) +
+            a('อาการนำมาก่อน', item.aura) +
             a('ตำแหน่งที่ปวด', item.location) +
             a('ลักษณะที่ปวด', item.pain_character) +
             b('ความรุนแรง', item.severity) +
-            b('แย่ลงเมื่อเคลื่อนไหว', item.worsen_movement) +
-            b('คลื่นไส้', item.nausea) +
-            b('ตาแดง/น้ำตา/น้ำมูก', item.autonomic) +
-            b('แย่ลงเมื่อมีแสงจ้า', item.worsen_light) +
-            b('แย่ลงเมื่อมีเสียงดัง', item.worsen_noise) +
+            b('แย่ลงเมื่อเคลื่อนไหวหรือออกแรง', item.worsen_movement) +
+            b('มีคลื่นไส้ร่วมด้วยหรือไม่', item.nausea) +
+            b('มีตาแดง น้ำตา น้ำมูกไหลร่วมด้วย', item.autonomic) +
+            b('แย่ลงเมื่อมีแสงจ้าๆ', item.worsen_light) +
+            b('แย่ลงเมื่อมีเสียงดังๆ', item.worsen_noise) +
             b('ระยะเวลาที่ปวด', (item.duration_val ? item.duration_val + ' ' + item.duration_unit : '-')) +
             b('สิ่งกระตุ้น', item.triggers) +
             b('ยาที่กิน', (item.med_name ? item.med_name + ' (ขนาด ' + (item.med_dose||'-') + ')' : '-'));
@@ -582,7 +657,7 @@
         mSel.value = new Date().getMonth();
     }
 
-    // === โครงสร้าง Template ตารางรายงานตามแบบฟอร์มจริง ===
+    // === โครงสร้างตารางรายงานแบบตัดคอลัมน์ตัวอย่างออก และจัดกลุ่มคงที่ 100% ===
     function generateReport() {
         var ySel = document.getElementById('yearSelect');
         var mSel = document.getElementById('monthSelect');
@@ -590,8 +665,17 @@
 
         var y = parseInt(ySel.value, 10);
         var mStr = mSel.value;
-        
-        // กรองข้อมูลตามปีและเดือนที่เลือก
+        var monthIndex = mStr === 'all' ? new Date().getMonth() : parseInt(mStr, 10);
+        var monthName = mSel.options[mSel.selectedIndex].text;
+        var yearDisplay = ySel.options[ySel.selectedIndex].text;
+
+        // ข้อ 4: อัปเดตชื่อผู้ใช้และลายน้ำ
+        var uName = (currentUser && currentUser.name) ? currentUser.name : 'ทั่วไป';
+        document.getElementById('reportUserName').innerText = uName;
+        document.getElementById('reportMonthYear').innerText = monthName + ' ' + yearDisplay;
+        document.getElementById('watermarkEl').innerText = uName;
+
+        // กรองข้อมูลเฉพาะปีและเดือนที่เลือก
         var filteredData = recordsData.filter(function(r) {
             if (!r.record_date) return false;
             var parts = String(r.record_date).split('T')[0].split('-');
@@ -600,51 +684,47 @@
             var recMonth = parseInt(parts[1], 10) - 1;
             
             if (recYear !== y) return false;
-            if (mStr !== 'all' && recMonth !== parseInt(mStr, 10)) return false;
+            if (mStr !== 'all' && recMonth !== monthIndex) return false;
             return true;
         });
 
-        var targetMonth = mStr === 'all' ? new Date().getMonth() : parseInt(mStr, 10);
-        var daysInMonth = new Date(y, targetMonth + 1, 0).getDate();
+        var daysInMonth = new Date(y, monthIndex + 1, 0).getDate();
         var dayLetters = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
 
         var html = '<table id="reportTable"><thead>';
 
-        // Header แถว 1: วันในสัปดาห์
+        // Header 1: วันในสัปดาห์
         html += '<tr>';
         html += '<th colspan="2" class="col-head">คำถาม / ตัวเลือก</th>';
-        html += '<th class="col-example">ศ.</th>';
         for (var i = 1; i <= daysInMonth; i++) {
-            var d = new Date(y, targetMonth, i);
+            var d = new Date(y, monthIndex, i);
             var dayText = dayLetters[d.getDay()];
-            html += '<th style="width:22px; font-weight:normal;">' + dayText + '</th>';
+            html += '<th style="width:23px; font-weight:normal;">' + dayText + '</th>';
         }
         html += '</tr>';
 
-        // Header แถว 2: วันที่
+        // Header 2: วันที่
         html += '<tr>';
         html += '<th colspan="2" class="col-head">วันที่</th>';
-        html += '<th class="col-example">1/12</th>';
         for (var i = 1; i <= daysInMonth; i++) {
             html += '<th>' + i + '</th>';
         }
         html += '</tr></thead><tbody>';
 
-        // รายการกลุ่มคำถามและตัวเลือก (ตรงตามแบบฟอร์ม)
-        var groups = [
+        // โครงสร้างคำถามและตัวเลือก (ตัดคอลัมน์ตัวอย่างออก และคำนวณ Span คงที่)
+        var questions = [
             {
-                label: 'เวลาที่ปวดศีรษะ',
-                rows: [
-                    { sub: '', example: '9.00', field: 'time' }
+                title: 'เวลาที่ปวดศีรษะ',
+                options: [
+                    { label: '', field: 'time' }
                 ]
             },
             {
-                label: 'อาการที่เกิดขึ้นนำมาก่อน<br>อาการปวดศีรษะ',
-                rows: [
-                    { sub: 'เห็นแสง', example: '<span class="example-box"></span>', check: function(r) { return hasVal(r.aura, 'เห็นแสง'); } },
+                title: 'อาการที่เกิดขึ้นนำมาก่อน<br>อาการปวดศีรษะ',
+                options: [
+                    { label: 'เห็นแสง', check: function(r) { return hasVal(r.aura, 'เห็นแสง'); } },
                     { 
-                        sub: 'มีอาการอื่น', 
-                        example: '<span class="example-box"></span>', 
+                        label: 'มีอาการอื่น', 
                         check: function(r) { return hasVal(r.aura, 'มีอาการอื่น'); },
                         getExtra: function(r) {
                             if (!r.aura) return '';
@@ -659,96 +739,93 @@
                 ]
             },
             {
-                label: 'ตำแหน่งที่ปวด',
-                rows: [
-                    { sub: 'ซ้าย', example: '<span class="example-box"></span>', check: function(r) { return hasVal(r.location, 'ซ้าย'); } },
-                    { sub: 'ขวา', example: '<span class="example-box"></span>', check: function(r) { return hasVal(r.location, 'ขวา'); } },
-                    { sub: 'ทั้ง 2 ข้าง', example: '<span class="example-box"></span>', check: function(r) { return hasVal(r.location, 'ทั้ง 2 ข้าง'); } }
+                title: 'ตำแหน่งที่ปวด',
+                options: [
+                    { label: 'ซ้าย', check: function(r) { return hasVal(r.location, 'ซ้าย'); } },
+                    { label: 'ขวา', check: function(r) { return hasVal(r.location, 'ขวา'); } },
+                    { label: 'ทั้ง 2 ข้าง', check: function(r) { return hasVal(r.location, 'ทั้ง 2 ข้าง'); } }
                 ]
             },
             {
-                label: 'ลักษณะที่ปวด',
-                rows: [
-                    { sub: 'ตุบๆ', example: '<span class="example-box"></span>', check: function(r) { return hasVal(r.pain_character, 'ตุบๆ'); } },
-                    { sub: 'กดบีบ', example: '<span class="example-box"></span>', check: function(r) { return hasVal(r.pain_character, 'กดบีบ'); } },
-                    { sub: 'แหลมปรี๊ด', example: '<span class="example-box"></span>', check: function(r) { return hasVal(r.pain_character, 'แหลมปรี๊ด'); } }
+                title: 'ลักษณะที่ปวด',
+                options: [
+                    { label: 'ตุบๆ', check: function(r) { return hasVal(r.pain_character, 'ตุบๆ'); } },
+                    { label: 'กดบีบ', check: function(r) { return hasVal(r.pain_character, 'กดบีบ'); } },
+                    { label: 'แหลมปรี๊ด', check: function(r) { return hasVal(r.pain_character, 'แหลมปรี๊ด'); } }
                 ]
             },
             {
-                label: 'ความรุนแรงของอาการปวด',
-                rows: [
-                    { sub: 'เล็กน้อย ถึง<br>ทำงานต่อได้', example: '<span class="example-box"></span>', check: function(r) { return hasVal(r.severity, 'เล็กน้อย'); } },
-                    { sub: 'ปานกลาง<br>ทำงานได้ลดลง', example: '<span class="example-box"></span>', check: function(r) { return hasVal(r.severity, 'ปานกลาง'); } },
-                    { sub: 'รุนแรง ทำงาน<br>ต่อไม่ได้', example: '<span class="example-box"></span>', check: function(r) { return hasVal(r.severity, 'รุนแรง'); } }
+                title: 'ความรุนแรงของอาการปวด',
+                options: [
+                    { label: 'เล็กน้อย ถึง<br>ทำงานต่อได้', check: function(r) { return hasVal(r.severity, 'เล็กน้อย'); } },
+                    { label: 'ปานกลาง<br>ทำงานได้ลดลง', check: function(r) { return hasVal(r.severity, 'ปานกลาง'); } },
+                    { label: 'รุนแรง ทำงาน<br>ต่อไม่ได้', check: function(r) { return hasVal(r.severity, 'รุนแรง'); } }
                 ]
             },
             {
-                label: 'อาการปวดแย่ลงเมื่อ<br>เคลื่อนไหวหรือออกแรง',
-                rows: [
-                    { sub: 'แย่ลง', example: '<span class="example-box"></span>', check: function(r) { return r.worsen_movement === 'แย่ลง'; } },
-                    { sub: 'ไม่เปลี่ยนแปลง', example: '<span class="example-box"></span>', check: function(r) { return r.worsen_movement === 'ไม่เปลี่ยนแปลง'; } }
+                title: 'อาการปวดแย่ลงเมื่อ<br>เคลื่อนไหวหรือออกแรง',
+                options: [
+                    { label: 'แย่ลง', check: function(r) { return r.worsen_movement === 'แย่ลง'; } },
+                    { label: 'ไม่เปลี่ยนแปลง', check: function(r) { return r.worsen_movement === 'ไม่เปลี่ยนแปลง'; } }
                 ]
             },
             {
-                label: 'มีคลื่นไส้ร่วมด้วย<br>หรือไม่',
-                rows: [
-                    { sub: 'มี', example: '<span class="example-box"></span>', check: function(r) { return r.nausea === 'มี'; } },
-                    { sub: 'ไม่มี', example: '<span class="example-box"></span>', check: function(r) { return r.nausea === 'ไม่มี'; } }
+                title: 'มีคลื่นไส้ร่วมด้วย<br>หรือไม่',
+                options: [
+                    { label: 'มี', check: function(r) { return r.nausea === 'มี'; } },
+                    { label: 'ไม่มี', check: function(r) { return r.nausea === 'ไม่มี'; } }
                 ]
             },
             {
-                label: 'มีตาแดง น้ำตา น้ำมูก<br>ไหลร่วมด้วย',
-                rows: [
-                    { sub: 'มี', example: '<span class="example-box"></span>', check: function(r) { return r.autonomic === 'มี'; } },
-                    { sub: 'ไม่มี', example: '<span class="example-box"></span>', check: function(r) { return r.autonomic === 'ไม่มี'; } }
+                title: 'มีตาแดง น้ำตา น้ำมูก<br>ไหลร่วมด้วย',
+                options: [
+                    { label: 'มี', check: function(r) { return r.autonomic === 'มี'; } },
+                    { label: 'ไม่มี', check: function(r) { return r.autonomic === 'ไม่มี'; } }
                 ]
             },
             {
-                label: 'อาการปวดแย่ลงเมื่อมี<br>แสงจ้าๆ',
-                rows: [
-                    { sub: 'แย่ลง', example: '<span class="example-box"></span>', check: function(r) { return r.worsen_light === 'แย่ลง'; } },
-                    { sub: 'ไม่เปลี่ยนแปลง', example: '<span class="example-box"></span>', check: function(r) { return r.worsen_light === 'ไม่เปลี่ยนแปลง'; } }
+                title: 'อาการปวดแย่ลงเมื่อมี<br>แสงจ้าๆ',
+                options: [
+                    { label: 'แย่ลง', check: function(r) { return r.worsen_light === 'แย่ลง'; } },
+                    { label: 'ไม่เปลี่ยนแปลง', check: function(r) { return r.worsen_light === 'ไม่เปลี่ยนแปลง'; } }
                 ]
             },
             {
-                label: 'อาการปวดแย่ลงเมื่อได้<br>ยินเสียงดังๆ',
-                rows: [
-                    { sub: 'แย่ลง', example: '<span class="example-box"></span>', check: function(r) { return r.worsen_noise === 'แย่ลง'; } },
-                    { sub: 'ไม่เปลี่ยนแปลง', example: '<span class="example-box"></span>', check: function(r) { return r.worsen_noise === 'ไม่เปลี่ยนแปลง'; } }
+                title: 'อาการปวดแย่ลงเมื่อได้<br>ยินเสียงดังๆ',
+                options: [
+                    { label: 'แย่ลง', check: function(r) { return r.worsen_noise === 'แย่ลง'; } },
+                    { label: 'ไม่เปลี่ยนแปลง', check: function(r) { return r.worsen_noise === 'ไม่เปลี่ยนแปลง'; } }
                 ]
             },
             {
-                label: 'ปวดอยู่นานเท่าใด',
-                rows: [
-                    { sub: '', example: '4ชม.', field: 'duration' }
+                title: 'ปวดอยู่นานเท่าใด',
+                options: [
+                    { label: '', field: 'duration' }
                 ]
             },
             {
-                label: 'สิ่งกระตุ้นอาการปวด',
-                rows: [
-                    { sub: 'ระบุ', example: 'เครียด', field: 'triggers' }
+                title: 'สิ่งกระตุ้นอาการปวด',
+                options: [
+                    { label: 'ระบุ', field: 'triggers' }
                 ]
             },
             {
-                label: 'ยาและขนาดที่กิน',
-                rows: [
-                    { sub: 'ชื่อยา', example: 'พารา', field: 'meds' }
+                title: 'ยาและขนาดที่กิน',
+                options: [
+                    { label: 'ชื่อยา', field: 'meds' }
                 ]
             }
         ];
 
-        // เรนเดอร์แถวข้อมูลทั้งหมด
-        groups.forEach(function(group) {
-            group.rows.forEach(function(row, rIdx) {
+        questions.forEach(function(q) {
+            q.options.forEach(function(opt, optIdx) {
                 html += '<tr>';
-                // คอลัมน์ที่ 1: โจทย์หัวข้อหลัก
-                if (rIdx === 0) {
-                    html += '<td class="col-head" rowspan="' + group.rows.length + '">' + group.label + '</td>';
+                // คอลัมน์ที่ 1: หัวข้อหลัก
+                if (optIdx === 0) {
+                    html += '<td class="col-head" rowspan="' + q.options.length + '">' + q.title + '</td>';
                 }
                 // คอลัมน์ที่ 2: ตัวเลือก
-                html += '<td class="col-sub">' + (row.sub || '') + '</td>';
-                // คอลัมน์ที่ 3: ตัวอย่างการกรอก (ต.ย.)
-                html += '<td class="col-example">' + (row.example || '') + '</td>';
+                html += '<td class="col-sub">' + (opt.label || '') + '</td>';
 
                 // คอลัมน์วันที่ 1 ถึง 31
                 for (var i = 1; i <= daysInMonth; i++) {
@@ -760,20 +837,20 @@
                     var cellContent = '';
                     if (recordsForDay.length > 0) {
                         var rec = recordsForDay[0];
-                        if (row.field === 'time') {
+                        if (opt.field === 'time') {
                             cellContent = '<div class="text-val">' + (rec.record_time ? rec.record_time.slice(0,5) : '') + '</div>';
-                        } else if (row.field === 'duration') {
+                        } else if (opt.field === 'duration') {
                             cellContent = '<div class="text-val">' + (rec.duration_val ? (rec.duration_val + (rec.duration_unit ? rec.duration_unit[0] : '')) : '') + '</div>';
-                        } else if (row.field === 'triggers') {
+                        } else if (opt.field === 'triggers') {
                             cellContent = '<div class="text-val">' + (rec.triggers || '') + '</div>';
-                        } else if (row.field === 'meds') {
-                            cellContent = '<div class="text-val" style="font-size:8px;">' + (rec.med_name || '') + (rec.med_dose ? '<br>' + rec.med_dose : '') + '</div>';
-                        } else if (row.check && row.check(rec)) {
+                        } else if (opt.field === 'meds') {
+                            cellContent = '<div class="text-val" style="font-size:7.5px;">' + (rec.med_name || '') + (rec.med_dose ? '<br>' + rec.med_dose : '') + '</div>';
+                        } else if (opt.check && opt.check(rec)) {
                             cellContent = '<div class="red-dot"></div>';
-                            if (row.getExtra) {
-                                var extra = row.getExtra(rec);
+                            if (opt.getExtra) {
+                                var extra = opt.getExtra(rec);
                                 if (extra) {
-                                    cellContent += '<div class="text-val" style="font-size:8px; margin-top:2px;">' + extra + '</div>';
+                                    cellContent += '<div class="text-val" style="font-size:7px; margin-top:1px;">' + extra + '</div>';
                                 }
                             }
                         }
@@ -785,20 +862,44 @@
         });
 
         html += '</tbody></table>';
-        document.getElementById('reportRenderArea').innerHTML = html;
+        document.getElementById('tableMountPoint').innerHTML = html;
     }
 
+    // Export รูปภาพ JPG
+    function exportJPG() {
+        var element = document.getElementById('reportRenderArea');
+        var mSel = document.getElementById('monthSelect');
+        var monthName = mSel.options[mSel.selectedIndex].text;
+        var userName = (currentUser && currentUser.name) ? currentUser.name : 'User';
+
+        if (window.html2canvas) {
+            html2canvas(element, { scale: 2, useCORS: true, backgroundColor: '#ffffff' }).then(function(canvas) {
+                var link = document.createElement('a');
+                link.download = 'Headache_Diary_' + userName + '_' + monthName + '.jpg';
+                link.href = canvas.toDataURL('image/jpeg', 0.95);
+                link.click();
+            });
+        } else {
+            alert("ไลบรารีสร้างรูปภาพยังโหลดไม่เสร็จ กรุณารอสักครู่แล้วลองใหม่ครับ");
+        }
+    }
+
+    // Export PDF ให้จบใน 1 หน้า A4 แนวนอน
     function exportPDF() {
         var element = document.getElementById('reportRenderArea');
         var mSel = document.getElementById('monthSelect');
         var monthName = mSel.options[mSel.selectedIndex].text;
+        var userName = (currentUser && currentUser.name) ? currentUser.name : 'User';
+
         var opt = {
-            margin: 0.15,
-            filename: 'Headache_Diary_' + monthName + '.pdf',
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true },
-            jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' }
+            margin:       [4, 4, 4, 4], // ระยะขอบ 4mm รอบด้าน
+            filename:     'Headache_Diary_' + userName + '_' + monthName + '.pdf',
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true, letterRendering: true },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' },
+            pagebreak:    { mode: ['avoid-all'] }
         };
+
         if (window.html2pdf) {
             html2pdf().set(opt).from(element).save();
         } else {
