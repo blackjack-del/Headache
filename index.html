@@ -4,13 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>บันทึกอาการปวดศีรษะ (Headache Diary)</title>
-    <!-- Supabase SDK & html2pdf -->
+    
+    <!-- 1. ตัวดักจับ Error อิสระชุดบนสุด (ดักข้อผิดพลาดทุกกรณีบนมือถือ) -->
+    <script>
+        window.addEventListener('error', function(e) {
+            alert("🚨 ตรวจพบข้อผิดพลาดในหน้าเว็บ:\n" + e.message + "\n(บรรทัดที่: " + e.lineno + ")");
+        });
+    </script>
+
+    <!-- 2. Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
     <style>
         :root {
             --primary: #4f46e5;
-            --primary-hover: #4338ca;
             --bg: #f8fafc;
             --card: #ffffff;
             --text: #1e293b;
@@ -21,32 +28,28 @@
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; }
         .container { max-width: 800px; margin: 0 auto; padding: 15px; }
         
-        /* Auth UI */
         #authSection { display: flex; min-height: 100vh; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 20px; box-sizing: border-box; }
-        .auth-card { background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); width: 100%; max-width: 400px; border: 1px solid var(--border); box-sizing: border-box; }
+        .auth-card { background: #fff; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); width: 100%; max-width: 400px; border: 1px solid var(--border); box-sizing: border-box; }
         .auth-card h3 { margin-top: 0; color: var(--primary); font-size: 18px; margin-bottom: 15px; }
-        .auth-card select, .auth-card input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid var(--border); border-radius: 8px; font-size: 15px; box-sizing: border-box; }
-        .btn-local { width: 100%; background: var(--primary); color: white; padding: 12px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }
+        .auth-card select, .auth-card input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid var(--border); border-radius: 8px; font-size: 16px; box-sizing: border-box; }
+        .btn-local { width: 100%; background: var(--primary); color: white; padding: 14px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }
         
-        .divider { display: flex; align-items: center; text-align: center; margin: 15px 0; color: #94a3b8; font-size: 14px; }
+        .divider { display: flex; align-items: center; text-align: center; margin: 15px 0; color: #94a3b8; font-size: 13px; }
         .divider::before, .divider::after { content: ''; flex: 1; border-bottom: 1px solid var(--border); }
         .divider:not(:empty)::before { margin-right: .5em; }
         .divider:not(:empty)::after { margin-left: .5em; }
         
         .btn-google { width: 100%; background: #fff; color: #333; border: 1px solid #ccc; padding: 12px; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; }
-        .alert-error { display: none; background: #fee2e2; border: 1px solid #ef4444; color: #b91c1c; padding: 10px; border-radius: 6px; margin-bottom: 15px; font-size: 13px; text-align: left; }
 
-        /* Nav & Profile */
-        nav { background: var(--card); padding: 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
-        .profile { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: bold; }
-        .profile img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
-        .tabs { display: flex; gap: 5px; flex-wrap: wrap; }
-        .tab-btn { padding: 8px 16px; border: none; background: var(--border); border-radius: 6px; cursor: pointer; font-weight: bold; }
+        nav { background: var(--card); padding: 12px 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .profile { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: bold; }
+        .profile img { width: 32px; height: 32px; border-radius: 50%; }
+        .tabs { display: flex; gap: 5px; }
+        .tab-btn { padding: 8px 12px; border: none; background: var(--border); border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; }
         .tab-btn.active { background: var(--primary); color: #fff; }
         .btn-logout { background: var(--danger); color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
 
-        /* Forms */
-        .tab-content { display: none; padding: 20px 0; }
+        .tab-content { display: none; padding: 15px 0; }
         .tab-content.active { display: block; }
         .card { background: var(--card); padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px; }
         h2 { font-size: 18px; color: var(--primary); margin-top: 0; border-bottom: 2px solid var(--primary); padding-bottom: 8px; }
@@ -57,28 +60,26 @@
         input[type="date"], input[type="time"], input[type="text"], input[type="number"], select { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 16px; box-sizing: border-box; }
         
         .options-group { display: flex; flex-direction: column; gap: 8px; background: #f1f5f9; padding: 10px; border-radius: 6px; }
-        .option-label { display: flex; align-items: center; gap: 8px; font-weight: normal; margin: 0; font-size: 15px; cursor: pointer; }
+        .option-label { display: flex; align-items: center; gap: 8px; font-weight: normal; margin: 0; font-size: 15px; }
         .option-label input { width: 18px; height: 18px; accent-color: var(--primary); }
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
         .btn-submit { width: 100%; background: var(--primary); color: white; padding: 15px; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 10px; }
         
-        /* History & Report */
         .history-item { padding: 15px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; background: #fff; }
         .history-date { font-weight: bold; color: var(--primary); }
         .history-actions { display: flex; gap: 10px; }
         .btn-view { color: var(--primary); text-decoration: underline; background: none; border: none; cursor: pointer; font-weight: bold; }
         .btn-del { color: var(--danger); background: none; border: none; cursor: pointer; }
-        #exportControls { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+
         .table-container { overflow-x: auto; background: #fff; border: 1px solid var(--border); padding: 10px; }
         #reportTable { border-collapse: collapse; width: 100%; min-width: 900px; font-size: 11px; table-layout: fixed; }
         #reportTable th, #reportTable td { border: 1px solid #000; padding: 2px 4px; text-align: center; vertical-align: middle; }
-        #reportTable th.col-head { text-align: left; width: 100px; background: #f1f5f9; word-wrap: break-word; }
-        #reportTable th.col-sub { text-align: left; width: 80px; background: #f8fafc; word-wrap: break-word; }
+        #reportTable th.col-head { text-align: left; width: 100px; background: #f1f5f9; }
+        #reportTable th.col-sub { text-align: left; width: 80px; background: #f8fafc; }
         .red-dot { width: 10px; height: 10px; background-color: var(--dot-color); border-radius: 50%; margin: 0 auto; display: block; }
         .text-val { font-size: 9px; line-height: 1.1; }
-        
-        /* Modal */
+
         .modal { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; padding: 15px; box-sizing: border-box; }
         .modal.active { display: flex; }
         .modal-content { background: #fff; padding: 20px; border-radius: 10px; width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto; position: relative; }
@@ -91,43 +92,41 @@
 </head>
 <body>
 
-    <!-- Section Login -->
+    <!-- 1. ส่วนหน้าต่างล็อกอิน -->
     <div id="authSection">
-        <h1 style="color: var(--primary); margin-bottom: 10px;">🩺 Headache Diary</h1>
-        <p style="margin-top: 0; color: #64748b; margin-bottom: 25px;">บันทึกประวัติอาการปวดศีรษะประจำวัน</p>
+        <h1 style="color: var(--primary); margin-bottom: 5px;">🩺 Headache Diary</h1>
+        <p style="margin-top: 0; color: #64748b; margin-bottom: 20px;">บันทึกประวัติอาการปวดศีรษะ</p>
         
         <div class="auth-card">
-            <div id="errorBox" class="alert-error"></div>
-            
-            <h3>เข้าสู่ระบบแบบระบุชื่อ</h3>
+            <h3>เข้าสู่ระบบ</h3>
             <select id="existingUsers">
-                <option value="">-- เลือกชื่อผู้ใช้เดิม --</option>
+                <option value="">-- เลือกชื่อเดิมในระบบ --</option>
             </select>
-            <div class="divider">หรือ</div>
-            <input type="text" id="newUserName" placeholder="พิมพ์ชื่อผู้ใช้ใหม่ที่นี่">
-            <button type="button" class="btn-local" onclick="loginLocal()">เข้าสู่ระบบ</button>
+            <div class="divider">หรือพิมพ์ชื่อใหม่</div>
+            <input type="text" id="newUserName" placeholder="ใส่ชื่อของคุณ เช่น กิตติ">
+            <button type="button" class="btn-local" onclick="handleLoginClick()">เข้าสู่ระบบ</button>
             
             <div class="divider">ตัวเลือกเสริม</div>
             
             <button type="button" class="btn-google" onclick="loginGoogle()">
-                <img src="https://www.svgrepo.com/show/475656/google-color.svg" width="20" alt="Google">
+                <img src="https://www.svgrepo.com/show/475656/google-color.svg" width="18" alt="Google">
                 เข้าสู่ระบบด้วย Google
             </button>
         </div>
     </div>
 
-    <!-- Section App -->
+    <!-- 2. ส่วนหน้าแอปพลิเคชัน -->
     <div id="appSection" style="display: none;">
         <nav>
-            <div class="profile" id="userProfile">
-                <img id="userImg" src="" alt="">
+            <div class="profile">
+                <img id="userImg" src="" alt="avatar">
                 <span id="userName">User</span>
-                <button class="btn-logout" type="button" onclick="logout()">ออกจากระบบ</button>
+                <button class="btn-logout" type="button" onclick="logout()">ออก</button>
             </div>
             <div class="tabs">
-                <button class="tab-btn active" type="button" onclick="switchTab('inputTab', this)">📝 บันทึก</button>
-                <button class="tab-btn" type="button" onclick="switchTab('historyTab', this)">🕒 ประวัติ</button>
-                <button class="tab-btn" type="button" onclick="switchTab('exportTab', this)">📊 ตารางรายงาน</button>
+                <button class="tab-btn active" type="button" onclick="switchTab('inputTab', this)">บันทึก</button>
+                <button class="tab-btn" type="button" onclick="switchTab('historyTab', this)">ประวัติ</button>
+                <button class="tab-btn" type="button" onclick="switchTab('exportTab', this)">รายงาน</button>
             </div>
         </nav>
 
@@ -143,7 +142,7 @@
                         </div>
 
                         <div class="form-row">
-                            <label>อาการที่เกิดขึ้นนำมาก่อน (Aura)</label>
+                            <label>อาการนำมาก่อน (Aura)</label>
                             <div class="options-group">
                                 <label class="option-label"><input type="checkbox" name="aura" value="เห็นแสง"> เห็นแสง</label>
                                 <label class="option-label"><input type="checkbox" name="aura" value="มีอาการอื่น"> มีอาการอื่น</label>
@@ -169,7 +168,7 @@
                         </div>
 
                         <div class="form-row">
-                            <label>ความรุนแรงของอาการ</label>
+                            <label>ความรุนแรง</label>
                             <div class="options-group">
                                 <label class="option-label"><input type="radio" name="severity" value="เล็กน้อย ถึง ทำงานต่อได้"> เล็กน้อย (ทำงานต่อได้)</label>
                                 <label class="option-label"><input type="radio" name="severity" value="ปานกลาง ทำงานได้ลดลง"> ปานกลาง (ทำงานได้ลดลง)</label>
@@ -186,14 +185,14 @@
                                 </div>
                             </div>
                             <div class="form-row">
-                                <label>มีคลื่นไส้ร่วมด้วย?</label>
+                                <label>คลื่นไส้?</label>
                                 <div class="options-group">
                                     <label class="option-label"><input type="radio" name="nausea" value="มี"> มี</label>
                                     <label class="option-label"><input type="radio" name="nausea" value="ไม่มี"> ไม่มี</label>
                                 </div>
                             </div>
                             <div class="form-row">
-                                <label>มีตาแดง น้ำตา น้ำมูก?</label>
+                                <label>ตาแดง น้ำตา น้ำมูก?</label>
                                 <div class="options-group">
                                     <label class="option-label"><input type="radio" name="auto" value="มี"> มี</label>
                                     <label class="option-label"><input type="radio" name="auto" value="ไม่มี"> ไม่มี</label>
@@ -218,7 +217,7 @@
                         <div class="form-row">
                             <label>ปวดอยู่นานเท่าใด</label>
                             <div style="display:flex; gap:10px;">
-                                <input type="number" id="dur_val" placeholder="ระบุตัวเลข" style="flex:2;">
+                                <input type="number" id="dur_val" placeholder="ตัวเลข" style="flex:2;">
                                 <select id="dur_unit" style="flex:1;">
                                     <option value="นาที">นาที</option>
                                     <option value="ชั่วโมง">ชั่วโมง</option>
@@ -228,14 +227,14 @@
 
                         <div class="form-row">
                             <label>สิ่งกระตุ้นอาการปวด</label>
-                            <input type="text" id="triggers" placeholder="เช่น ความเครียด, อดนอน, ประจำเดือน">
+                            <input type="text" id="triggers" placeholder="เช่น อดนอน, เครียด">
                         </div>
 
                         <div class="form-row">
                             <label>ยาและขนาดที่กิน</label>
                             <div style="display:flex; gap:10px;">
                                 <input type="text" id="med_name" placeholder="ชื่อยา" style="flex:2;">
-                                <input type="text" id="med_dose" placeholder="ขนาด (เช่น 1 เม็ด)" style="flex:1;">
+                                <input type="text" id="med_dose" placeholder="ขนาด เช่น 1 เม็ด" style="flex:1;">
                             </div>
                         </div>
 
@@ -255,12 +254,12 @@
             <!-- แท็บรายงาน -->
             <div id="exportTab" class="tab-content">
                 <div class="card">
-                    <h2>ตารางรายงานสรุปรายเดือน</h2>
-                    <div id="exportControls">
+                    <h2>ตารางรายงานประจำเดือน</h2>
+                    <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
                         <select id="monthSelect" style="width: auto;"></select>
                         <select id="yearSelect" style="width: auto;"></select>
                         <button class="btn-local" type="button" style="width:auto; padding:8px 16px;" onclick="generateReport()">สร้างตาราง</button>
-                        <button class="btn-local" type="button" style="width:auto; padding:8px 16px; background:#ef4444;" onclick="exportPDF()">Export PDF</button>
+                        <button class="btn-local" type="button" style="width:auto; padding:8px 16px; background:#ef4444;" onclick="window.print()">พิมพ์ / บันทึก PDF</button>
                     </div>
                     
                     <div class="table-container" id="reportRenderArea"></div>
@@ -278,160 +277,75 @@
         </div>
     </div>
 
+    <!-- 3. ส่วนสคริปต์หลักของแอปพลิเคชัน -->
     <script>
-    // ดักจับ Error แสดงแจ้งเตือนบนจอมือถือทันที
-    window.onerror = function(msg, url, lineNo) {
-        alert("ตรวจพบข้อผิดพลาด:\n" + msg + "\n(บรรทัดที่: " + lineNo + ")");
-        return false;
-    };
-
 // === 1. ตรวจสอบค่าคอนฟิก Supabase ===
     const SUPABASE_URL = "https://zglonauqilgzbukygzwi.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpnbG9uYXVxaWxnemJ1a3lnendpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyMzA1MjgsImV4cCI6MjEwODgwNjUyOH0.vGCmTsz3lb42W0hXfZITSMhvwPw8JlbiPL9W2YCuu94";
+
 
     let supabase = null;
     let currentUser = null; 
     let recordsData = [];
 
-    function showError(msg) {
-        const box = document.getElementById('errorBox');
-        if (box) {
-            box.style.display = 'block';
-            box.innerHTML = `⚠️ <strong>ตรวจพบข้อผิดพลาด:</strong><br>${msg}`;
-        }
-    }
-
+    // เริ่มต้นเชื่อมต่อฐานข้อมูล
     try {
-        if (!window.supabase) {
-            showError("ไม่สามารถดาวน์โหลด Supabase SDK ได้ กรุณาเช็กการเชื่อมต่ออินเทอร์เน็ต");
-        } else if (RAW_URL.includes("วาง_") || !RAW_URL.startsWith("https://")) {
-            showError("กรุณาใส่ Supabase Project URL ให้ถูกต้อง (ขึ้นต้นด้วย https://)");
-        } else {
-            supabase = window.supabase.createClient(RAW_URL, RAW_KEY);
+        if (window.supabase && SUPABASE_URL.startsWith("https://")) {
+            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         }
-    } catch (e) {
-        showError("Supabase Config Error: " + e.message);
+    } catch(err) {
+        console.warn("Supabase init error:", err);
     }
 
-    async function checkAuth() {
-        try {
-            if (supabase) {
-                const { data } = await supabase.auth.getSession();
-                if (data && data.session) {
-                    currentUser = { 
-                        id: data.session.user.id, 
-                        name: data.session.user.user_metadata.full_name || data.session.user.email,
-                        img: data.session.user.user_metadata.avatar_url 
-                    };
-                    showApp();
-                    return;
-                }
-            }
+    // ฟังก์ชันตอบสนองเมื่อกดปุ่มเข้าสู่ระบบ
+    function handleLoginClick() {
+        const selectEl = document.getElementById('existingUsers');
+        const inputEl = document.getElementById('newUserName');
+        
+        const existingName = selectEl ? selectEl.value : '';
+        const typedName = inputEl ? inputEl.value.trim() : '';
+        const finalName = typedName || existingName;
 
-            let localUser = null;
-            try {
-                localUser = localStorage.getItem('localHeadacheUser');
-            } catch(e) {}
-
-            if (localUser) {
-                currentUser = { 
-                    id: localUser, 
-                    name: localUser,
-                    img: `https://ui-avatars.com/api/?name=${encodeURIComponent(localUser)}&background=random`
-                };
-                showApp();
-                return;
-            }
-
-            loadExistingUsers();
-        } catch (err) {
-            loadExistingUsers();
-        }
-    }
-
-    async function loadExistingUsers() {
-        if (!supabase) return;
-        try {
-            const { data } = await supabase.from('headache_records').select('user_id');
-            if (data) {
-                const users = [...new Set(data.map(d => d.user_id))].filter(u => u && !u.includes('-'));
-                const sel = document.getElementById('existingUsers');
-                sel.innerHTML = '<option value="">-- เลือกชื่อผู้ใช้เดิม --</option>';
-                users.forEach(u => {
-                    sel.innerHTML += `<option value="${u}">${u}</option>`;
-                });
-            }
-        } catch (e) {}
-    }
-
-    function loginLocal() {
-        try {
-            const existingEl = document.getElementById('existingUsers');
-            const newNameEl = document.getElementById('newUserName');
-            
-            const existing = existingEl ? existingEl.value : '';
-            const newName = newNameEl ? newNameEl.value.trim() : '';
-            const finalName = newName || existing;
-            
-            if (!finalName) {
-                alert('กรุณาพิมพ์ชื่อใหม่ หรือเลือกชื่อที่มีอยู่จากรายการ');
-                return;
-            }
-            
-            try {
-                localStorage.setItem('localHeadacheUser', finalName);
-            } catch (e) {
-                console.warn("ไม่สามารถเซฟลง LocalStorage ได้");
-            }
-            
-            currentUser = { 
-                id: finalName, 
-                name: finalName,
-                img: `https://ui-avatars.com/api/?name=${encodeURIComponent(finalName)}&background=random`
-            };
-            
-            showApp();
-        } catch (err) {
-            alert("เกิดข้อผิดพลาดในการเข้าสู่ระบบ: " + err.message);
-        }
-    }
-
-    async function loginGoogle() {
-        if (!supabase) {
-            alert("ไม่สามารถล็อกอิน Google ได้ เนื่องจากยังไม่ได้ตั้งค่า Supabase URL/Key");
+        if (!finalName) {
+            alert("กรุณาพิมพ์ชื่อใหม่ หรือเลือกชื่อเดิมจากรายการก่อนครับ");
             return;
         }
+
         try {
-            await supabase.auth.signInWithOAuth({ provider: 'google' });
-        } catch (err) {
-            alert("เข้าสู่ระบบล้มเหลว: " + err.message);
-        }
+            localStorage.setItem('localHeadacheUser', finalName);
+        } catch(e) {}
+
+        currentUser = {
+            id: finalName,
+            name: finalName,
+            img: "https://ui-avatars.com/api/?name=" + encodeURIComponent(finalName) + "&background=random"
+        };
+
+        // สลับหน้าจอทันที
+        document.getElementById('authSection').style.display = 'none';
+        document.getElementById('appSection').style.display = 'block';
+        document.getElementById('userName').innerText = currentUser.name;
+        document.getElementById('userImg').src = currentUser.img;
+
+        // โหลดข้อมูลในหน้าแอป
+        initFormDateTime();
+        loadHistory();
+        initReportSelects();
     }
 
-    function logout() {
-        if (supabase) {
-            try { supabase.auth.signOut(); } catch(e){}
-        }
-        try { localStorage.removeItem('localHeadacheUser'); } catch(e){}
-        window.location.reload();
-    }
+    // กำหนดวัน-เวลาปัจจุบันของไทยแบบไม่พึ่งคำสั่งที่มีปัญหาบน iOS
+    function initFormDateTime() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const mins = String(now.getMinutes()).padStart(2, '0');
 
-    function showApp() {
-        const auth = document.getElementById('authSection');
-        const app = document.getElementById('appSection');
-        if (auth) auth.style.display = 'none';
-        if (app) app.style.display = 'block';
-        
-        if (currentUser) {
-            const nameEl = document.getElementById('userName');
-            const imgEl = document.getElementById('userImg');
-            if (nameEl) nameEl.innerText = currentUser.name;
-            if (imgEl) imgEl.src = currentUser.img || 'https://via.placeholder.com/32';
-        }
-        
-        try { initFormDate(); } catch (e) {}
-        try { loadHistory(); } catch (e) {}
-        try { initReportSelects(); } catch (e) {}
+        const dInput = document.getElementById('r_date');
+        const tInput = document.getElementById('r_time');
+        if (dInput) dInput.value = year + '-' + month + '-' + day;
+        if (tInput) tInput.value = hours + ':' + mins;
     }
 
     function switchTab(tabId, btn) {
@@ -442,37 +356,70 @@
         if (tabId === 'exportTab') generateReport();
     }
 
-    // คำนวณเวลาท้องถิ่นไทย (UTC+7) รองรับ iOS/Safari และอุปกรณ์ทุกรุ่น
-    function initFormDate() {
+    async function checkSavedUser() {
         try {
-            const now = new Date();
-            const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
-            const bkkDate = new Date(utcTime + (7 * 3600000));
-            
-            const yyyy = bkkDate.getFullYear();
-            const mm = String(bkkDate.getMonth() + 1).padStart(2, '0');
-            const dd = String(bkkDate.getDate()).padStart(2, '0');
-            const hh = String(bkkDate.getHours()).padStart(2, '0');
-            const min = String(bkkDate.getMinutes()).padStart(2, '0');
-            
-            const dInput = document.getElementById('r_date');
-            const tInput = document.getElementById('r_time');
-            if (dInput) dInput.value = `${yyyy}-${mm}-${dd}`;
-            if (tInput) tInput.value = `${hh}:${min}`;
-        } catch (e) {}
+            const savedName = localStorage.getItem('localHeadacheUser');
+            if (savedName) {
+                currentUser = {
+                    id: savedName,
+                    name: savedName,
+                    img: "https://ui-avatars.com/api/?name=" + encodeURIComponent(savedName) + "&background=random"
+                };
+                document.getElementById('authSection').style.display = 'none';
+                document.getElementById('appSection').style.display = 'block';
+                document.getElementById('userName').innerText = currentUser.name;
+                document.getElementById('userImg').src = currentUser.img;
+                initFormDateTime();
+                loadHistory();
+                initReportSelects();
+                return;
+            }
+        } catch(e) {}
+
+        // ดึงชื่อเก่ามาใส่ Dropdown
+        if (supabase) {
+            try {
+                const { data } = await supabase.from('headache_records').select('user_id');
+                if (data) {
+                    const names = [...new Set(data.map(d => d.user_id))].filter(n => n && !n.includes('-'));
+                    const sel = document.getElementById('existingUsers');
+                    names.forEach(n => {
+                        const opt = document.createElement('option');
+                        opt.value = n;
+                        opt.textContent = n;
+                        sel.appendChild(opt);
+                    });
+                }
+            } catch(e) {}
+        }
     }
 
+    async function loginGoogle() {
+        if (!supabase) {
+            alert("ยังไม่ได้ตั้งค่าเชื่อมต่อฐานข้อมูล Supabase");
+            return;
+        }
+        await supabase.auth.signInWithOAuth({ provider: 'google' });
+    }
+
+    function logout() {
+        try { localStorage.removeItem('localHeadacheUser'); } catch(e) {}
+        if (supabase) supabase.auth.signOut();
+        window.location.reload();
+    }
+
+    // ฟังก์ชันบันทึกข้อมูล
     document.getElementById('recordForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         if (!supabase) {
-            alert("กรุณาตั้งค่า Supabase ให้เรียบร้อยก่อนบันทึกข้อมูล");
+            alert("กรุณาใส่ Supabase URL และ Key ในโค้ดก่อนทำการบันทึก");
             return;
         }
         const btn = document.getElementById('saveBtn');
         btn.disabled = true; btn.innerText = "กำลังบันทึก...";
 
-        const getChecked = (name) => Array.from(document.querySelectorAll(`input[name="${name}"]:checked`)).map(cb => cb.value);
-        const getRadio = (name) => { const el = document.querySelector(`input[name="${name}"]:checked`); return el ? el.value : null; };
+        const getChecked = (name) => Array.from(document.querySelectorAll('input[name="' + name + '"]:checked')).map(cb => cb.value);
+        const getRadio = (name) => { const el = document.querySelector('input[name="' + name + '"]:checked'); return el ? el.value : null; };
 
         const payload = {
             user_id: currentUser.id,
@@ -496,11 +443,11 @@
 
         const { error } = await supabase.from('headache_records').insert([payload]);
         if(error) { 
-            alert("เกิดข้อผิดพลาดในการบันทึก: " + error.message); 
+            alert("บันทึกล้มเหลว: " + error.message); 
         } else { 
             alert("บันทึกข้อมูลเรียบร้อยแล้ว"); 
             document.getElementById('recordForm').reset();
-            initFormDate();
+            initFormDateTime();
             loadHistory();
         }
         btn.disabled = false; btn.innerText = "บันทึกข้อมูล";
@@ -524,7 +471,7 @@
         list.innerHTML = data.map((item, idx) => `
             <div class="history-item">
                 <div class="history-info">
-                    <div class="history-date">📅 ${formatDate(item.record_date)} เวลา ${item.record_time.slice(0,5)} น.</div>
+                    <div class="history-date">📅 ${item.record_date} เวลา ${item.record_time.slice(0,5)} น.</div>
                     <div style="font-size:13px; color:#666; margin-top:4px;">ระดับ: ${item.severity || '-'}</div>
                 </div>
                 <div class="history-actions">
@@ -535,36 +482,27 @@
         `).join('');
     }
 
-    function formatDate(dateStr) {
-        if (!dateStr) return '';
-        const parts = dateStr.split('-');
-        if (parts.length === 3) {
-            return `${parseInt(parts[2])}/${parseInt(parts[1])}/${parseInt(parts[0]) + 543}`;
-        }
-        return dateStr;
-    }
-
     function viewDetail(idx) {
         const item = recordsData[idx];
-        document.getElementById('m_datetime').innerText = `บันทึกวันที่ ${formatDate(item.record_date)} ${item.record_time.slice(0,5)}`;
+        document.getElementById('m_datetime').innerText = "บันทึกวันที่ " + item.record_date + " เวลา " + item.record_time.slice(0,5);
         
-        const b = (label, val) => `<div><strong>${label}:</strong> ${val || '-'}</div>`;
-        const a = (label, arr) => `<div><strong>${label}:</strong> ${arr && arr.length > 0 ? arr.join(', ') : '-'}</div>`;
+        const b = (label, val) => '<div><strong>' + label + ':</strong> ' + (val || '-') + '</div>';
+        const a = (label, arr) => '<div><strong>' + label + ':</strong> ' + (arr && arr.length > 0 ? arr.join(', ') : '-') + '</div>';
 
-        document.getElementById('m_body').innerHTML = `
-            ${a('อาการนำ', item.aura)}
-            ${a('ตำแหน่งที่ปวด', item.location)}
-            ${a('ลักษณะที่ปวด', item.pain_character)}
-            ${b('ความรุนแรง', item.severity)}
-            ${b('แย่ลงเมื่อเคลื่อนไหว', item.worsen_movement)}
-            ${b('คลื่นไส้', item.nausea)}
-            ${b('ตาแดง/น้ำตา/น้ำมูก', item.autonomic)}
-            ${b('แย่ลงเมื่อมีแสงจ้า', item.worsen_light)}
-            ${b('แย่ลงเมื่อมีเสียงดัง', item.worsen_noise)}
-            ${b('ระยะเวลาที่ปวด', (item.duration_val ? item.duration_val + ' ' + item.duration_unit : '-'))}
-            ${b('สิ่งกระตุ้น', item.triggers)}
-            ${b('ยาที่กิน', (item.med_name ? item.med_name + ' (ขนาด ' + (item.med_dose||'-') + ')' : '-'))}
-        `;
+        document.getElementById('m_body').innerHTML = 
+            a('อาการนำ', item.aura) +
+            a('ตำแหน่งที่ปวด', item.location) +
+            a('ลักษณะที่ปวด', item.pain_character) +
+            b('ความรุนแรง', item.severity) +
+            b('แย่ลงเมื่อเคลื่อนไหว', item.worsen_movement) +
+            b('คลื่นไส้', item.nausea) +
+            b('ตาแดง/น้ำตา/น้ำมูก', item.autonomic) +
+            b('แย่ลงเมื่อมีแสงจ้า', item.worsen_light) +
+            b('แย่ลงเมื่อมีเสียงดัง', item.worsen_noise) +
+            b('ระยะเวลาที่ปวด', (item.duration_val ? item.duration_val + ' ' + item.duration_unit : '-')) +
+            b('สิ่งกระตุ้น', item.triggers) +
+            b('ยาที่กิน', (item.med_name ? item.med_name + ' (ขนาด ' + (item.med_dose||'-') + ')' : '-'));
+        
         document.getElementById('detailModal').classList.add('active');
     }
 
@@ -583,13 +521,12 @@
         if (!mSel || !ySel) return;
         
         const thMonths = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
-        
-        mSel.innerHTML = '<option value="all">-- ทุกเดือน --</option>' + thMonths.map((m, i) => `<option value="${i}">${m}</option>`).join('');
+        mSel.innerHTML = '<option value="all">-- ทุกเดือน --</option>' + thMonths.map((m, i) => '<option value="' + i + '">' + m + '</option>').join('');
         
         const currYear = new Date().getFullYear();
         ySel.innerHTML = '';
         for(let i = currYear; i >= currYear - 5; i--) {
-            ySel.innerHTML += `<option value="${i}">${i + 543}</option>`;
+            ySel.innerHTML += '<option value="' + i + '">' + (i + 543) + '</option>';
         }
         mSel.value = new Date().getMonth();
     }
@@ -609,7 +546,6 @@
         const dayLetters = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
         
         let html = '<table id="reportTable"><thead>';
-        
         html += '<tr><th colspan="2" class="col-head"></th>';
         for(let i=1; i<=daysInMonth; i++) {
             let dayText = '';
@@ -617,12 +553,12 @@
                 const d = new Date(y, parseInt(mStr), i);
                 dayText = dayLetters[d.getDay()];
             }
-            html += `<th style="width:20px; font-weight:normal;">${dayText}</th>`;
+            html += '<th style="width:20px; font-weight:normal;">' + dayText + '</th>';
         }
         html += '</tr>';
 
         html += '<tr><th class="col-head" colspan="2">วันที่</th>';
-        for(let i=1; i<=daysInMonth; i++) html += `<th>${i}</th>`;
+        for(let i=1; i<=daysInMonth; i++) html += '<th>' + i + '</th>';
         html += '</tr></thead><tbody>';
 
         const rows = [
@@ -654,9 +590,9 @@
         ];
 
         rows.forEach((row, rowIndex) => {
-            html += `<tr>`;
-            if (row.label !== '') html += `<td class="col-head" rowspan="${rows.filter(r => r.label === row.label || (r.label === '' && rowIndex > 0 && rows[rowIndex-1].label !== '' && !r.field)).length}">${row.label}</td>`;
-            if (row.sub !== '' || row.field) html += `<td class="col-sub">${row.sub}</td>`;
+            html += '<tr>';
+            if (row.label !== '') html += '<td class="col-head" rowspan="' + rows.filter(r => r.label === row.label || (r.label === '' && rowIndex > 0 && rows[rowIndex-1].label !== '' && !r.field)).length + '">' + row.label + '</td>';
+            if (row.sub !== '' || row.field) html += '<td class="col-sub">' + row.sub + '</td>';
             
             for(let i=1; i<=daysInMonth; i++) {
                 const recordsForDay = filteredData.filter(r => {
@@ -668,36 +604,25 @@
                 let cellContent = '';
                 if(recordsForDay.length > 0) {
                     const rec = recordsForDay[0]; 
-                    if(row.field === 'time') cellContent = `<div class="text-val">${rec.record_time.slice(0,5)}</div>`;
-                    else if(row.field === 'duration') cellContent = `<div class="text-val">${rec.duration_val ? rec.duration_val+rec.duration_unit[0] : ''}</div>`;
-                    else if(row.field === 'triggers') cellContent = `<div class="text-val">${rec.triggers || ''}</div>`;
-                    else if(row.field === 'meds') cellContent = `<div class="text-val" style="font-size:8px;">${rec.med_name || ''}<br>${rec.med_dose || ''}</div>`;
+                    if(row.field === 'time') cellContent = '<div class="text-val">' + rec.record_time.slice(0,5) + '</div>';
+                    else if(row.field === 'duration') cellContent = '<div class="text-val">' + (rec.duration_val ? rec.duration_val+rec.duration_unit[0] : '') + '</div>';
+                    else if(row.field === 'triggers') cellContent = '<div class="text-val">' + (rec.triggers || '') + '</div>';
+                    else if(row.field === 'meds') cellContent = '<div class="text-val" style="font-size:8px;">' + (rec.med_name || '') + '<br>' + (rec.med_dose || '') + '</div>';
                     else if(row.check && row.check(rec)) {
-                        cellContent = `<div class="red-dot"></div>`;
+                        cellContent = '<div class="red-dot"></div>';
                     }
                 }
-                html += `<td>${cellContent}</td>`;
+                html += '<td>' + cellContent + '</td>';
             }
-            html += `</tr>`;
+            html += '</tr>';
         });
 
         html += '</tbody></table>';
         document.getElementById('reportRenderArea').innerHTML = html;
     }
 
-    function exportPDF() {
-        const element = document.getElementById('reportRenderArea');
-        const opt = {
-            margin:       0.2,
-            filename:     `Headache_Diary_${document.getElementById('monthSelect').options[document.getElementById('monthSelect').selectedIndex].text}.pdf`,
-            image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2, useCORS: true },
-            jsPDF:        { unit: 'in', format: 'a4', orientation: 'landscape' }
-        };
-        html2pdf().set(opt).from(element).save();
-    }
-
-    document.addEventListener('DOMContentLoaded', checkAuth);
+    // เริ่มการตรวจสอบบัญชีเดิม
+    window.addEventListener('DOMContentLoaded', checkSavedUser);
     </script>
 </body>
 </html>
