@@ -4,16 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>บันทึกอาการปวดศีรษะ (Headache Diary)</title>
-    
-    <!-- 1. ตัวดักจับ Error อิสระชุดบนสุด (ดักข้อผิดพลาดทุกกรณีบนมือถือ) -->
-    <script>
-        window.addEventListener('error', function(e) {
-            alert("🚨 ตรวจพบข้อผิดพลาดในหน้าเว็บ:\n" + e.message + "\n(บรรทัดที่: " + e.lineno + ")");
-        });
-    </script>
-
-    <!-- 2. Supabase SDK -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <style>
         :root {
@@ -89,6 +79,96 @@
             .grid-2 { grid-template-columns: 1fr; }
         }
     </style>
+
+    <!-- ========================================== -->
+    <!-- ชั้นที่ 1: UI & LOGIN CORE (แยกเด็ดขาด ไม่พึ่งพาใคร) -->
+    <!-- ========================================== -->
+    <script>
+        // ดัก Error เฉพาะที่เกิดในหน้าตัวเอง ไม่แจ้งเตือน Script error ไร้สาระจากภายนอก
+        window.addEventListener('error', function(e) {
+            if (e.message && e.message !== 'Script error.') {
+                alert("แจ้งเตือนข้อผิดพลาด:\n" + e.message + "\n(บรรทัดที่: " + e.lineno + ")");
+            }
+        });
+
+        var currentUser = null;
+        var recordsData = [];
+
+        function handleLoginClick() {
+            var selectEl = document.getElementById('existingUsers');
+            var inputEl = document.getElementById('newUserName');
+            
+            var existingName = selectEl ? selectEl.value : '';
+            var typedName = inputEl ? inputEl.value.trim() : '';
+            var finalName = typedName || existingName;
+
+            if (!finalName) {
+                alert("กรุณาพิมพ์ชื่อใหม่ หรือเลือกชื่อเดิมจากรายการก่อนครับ");
+                return;
+            }
+
+            try {
+                localStorage.setItem('localHeadacheUser', finalName);
+            } catch(e) {}
+
+            currentUser = {
+                id: finalName,
+                name: finalName,
+                img: "https://ui-avatars.com/api/?name=" + encodeURIComponent(finalName) + "&background=random"
+            };
+
+            // สลับหน้าจอ
+            document.getElementById('authSection').style.display = 'none';
+            document.getElementById('appSection').style.display = 'block';
+            document.getElementById('userName').innerText = currentUser.name;
+            document.getElementById('userImg').src = currentUser.img;
+
+            initFormDateTime();
+            if (typeof loadHistory === 'function') loadHistory();
+            if (typeof initReportSelects === 'function') initReportSelects();
+        }
+
+        function initFormDateTime() {
+            var now = new Date();
+            var year = now.getFullYear();
+            var month = String(now.getMonth() + 1).padStart(2, '0');
+            var day = String(now.getDate()).padStart(2, '0');
+            var hours = String(now.getHours()).padStart(2, '0');
+            var mins = String(now.getMinutes()).padStart(2, '0');
+
+            var dInput = document.getElementById('r_date');
+            var tInput = document.getElementById('r_time');
+            if (dInput) dInput.value = year + '-' + month + '-' + day;
+            if (tInput) tInput.value = hours + ':' + mins;
+        }
+
+        function switchTab(tabId, btn) {
+            document.querySelectorAll('.tab-content').forEach(function(t) { t.classList.remove('active'); });
+            document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+            document.getElementById(tabId).classList.add('active');
+            btn.classList.add('active');
+            if (tabId === 'exportTab' && typeof generateReport === 'function') generateReport();
+        }
+
+        function logout() {
+            try { localStorage.removeItem('localHeadacheUser'); } catch(e) {}
+            if (window.supabaseClient) {
+                try { window.supabaseClient.auth.signOut(); } catch(e) {}
+            }
+            window.location.reload();
+        }
+
+        // ตรวจสอบล็อกอินเดิมอัตโนมัติ
+        window.addEventListener('DOMContentLoaded', function() {
+            try {
+                var saved = localStorage.getItem('localHeadacheUser');
+                if (saved) {
+                    document.getElementById('newUserName').value = saved;
+                    handleLoginClick();
+                }
+            } catch(e) {}
+        });
+    </script>
 </head>
 <body>
 
@@ -277,151 +357,73 @@
         </div>
     </div>
 
-    <!-- 3. ส่วนสคริปต์หลักของแอปพลิเคชัน -->
+    <!-- ========================================== -->
+    <!-- ชั้นที่ 2: SUPABASE & DATABASE LAYER -->
+    <!-- ========================================== -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" crossorigin="anonymous"></script>
     <script>
+    // ข้อควรระวัง: ตรวจสอบให้แน่ใจว่าเป็นเครื่องหมาย double-quote ปกติ (") ห้ามเป็นเครื่องหมายโค้ง (“ ”)
 // === 1. ตรวจสอบค่าคอนฟิก Supabase ===
     const SUPABASE_URL = "https://zglonauqilgzbukygzwi.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpnbG9uYXVxaWxnemJ1a3lnendpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyMzA1MjgsImV4cCI6MjEwODgwNjUyOH0.vGCmTsz3lb42W0hXfZITSMhvwPw8JlbiPL9W2YCuu94";
 
 
-    let supabase = null;
-    let currentUser = null; 
-    let recordsData = [];
+    window.supabaseClient = null;
 
-    // เริ่มต้นเชื่อมต่อฐานข้อมูล
     try {
-        if (window.supabase && SUPABASE_URL.startsWith("https://")) {
-            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        if (window.supabase && SUPABASE_URL.indexOf("https://") === 0) {
+            window.supabaseClient = window.supabase.createClient(SUPABASE_URL.trim(), SUPABASE_KEY.trim());
         }
     } catch(err) {
-        console.warn("Supabase init error:", err);
+        console.warn("ไม่สามารถสร้าง Supabase Client ได้:", err);
     }
 
-    // ฟังก์ชันตอบสนองเมื่อกดปุ่มเข้าสู่ระบบ
-    function handleLoginClick() {
-        const selectEl = document.getElementById('existingUsers');
-        const inputEl = document.getElementById('newUserName');
-        
-        const existingName = selectEl ? selectEl.value : '';
-        const typedName = inputEl ? inputEl.value.trim() : '';
-        const finalName = typedName || existingName;
-
-        if (!finalName) {
-            alert("กรุณาพิมพ์ชื่อใหม่ หรือเลือกชื่อเดิมจากรายการก่อนครับ");
-            return;
-        }
-
-        try {
-            localStorage.setItem('localHeadacheUser', finalName);
-        } catch(e) {}
-
-        currentUser = {
-            id: finalName,
-            name: finalName,
-            img: "https://ui-avatars.com/api/?name=" + encodeURIComponent(finalName) + "&background=random"
-        };
-
-        // สลับหน้าจอทันที
-        document.getElementById('authSection').style.display = 'none';
-        document.getElementById('appSection').style.display = 'block';
-        document.getElementById('userName').innerText = currentUser.name;
-        document.getElementById('userImg').src = currentUser.img;
-
-        // โหลดข้อมูลในหน้าแอป
-        initFormDateTime();
-        loadHistory();
-        initReportSelects();
-    }
-
-    // กำหนดวัน-เวลาปัจจุบันของไทยแบบไม่พึ่งคำสั่งที่มีปัญหาบน iOS
-    function initFormDateTime() {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        const hours = String(now.getHours()).padStart(2, '0');
-        const mins = String(now.getMinutes()).padStart(2, '0');
-
-        const dInput = document.getElementById('r_date');
-        const tInput = document.getElementById('r_time');
-        if (dInput) dInput.value = year + '-' + month + '-' + day;
-        if (tInput) tInput.value = hours + ':' + mins;
-    }
-
-    function switchTab(tabId, btn) {
-        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.getElementById(tabId).classList.add('active');
-        btn.classList.add('active');
-        if (tabId === 'exportTab') generateReport();
-    }
-
-    async function checkSavedUser() {
-        try {
-            const savedName = localStorage.getItem('localHeadacheUser');
-            if (savedName) {
-                currentUser = {
-                    id: savedName,
-                    name: savedName,
-                    img: "https://ui-avatars.com/api/?name=" + encodeURIComponent(savedName) + "&background=random"
-                };
-                document.getElementById('authSection').style.display = 'none';
-                document.getElementById('appSection').style.display = 'block';
-                document.getElementById('userName').innerText = currentUser.name;
-                document.getElementById('userImg').src = currentUser.img;
-                initFormDateTime();
-                loadHistory();
-                initReportSelects();
-                return;
-            }
-        } catch(e) {}
-
-        // ดึงชื่อเก่ามาใส่ Dropdown
-        if (supabase) {
-            try {
-                const { data } = await supabase.from('headache_records').select('user_id');
-                if (data) {
-                    const names = [...new Set(data.map(d => d.user_id))].filter(n => n && !n.includes('-'));
-                    const sel = document.getElementById('existingUsers');
-                    names.forEach(n => {
-                        const opt = document.createElement('option');
+    // โหลดรายชื่อผู้ใช้เดิม
+    function loadExistingUsersList() {
+        if (!window.supabaseClient) return;
+        window.supabaseClient.from('headache_records').select('user_id')
+            .then(function(res) {
+                if (res.data) {
+                    var names = [];
+                    res.data.forEach(function(d) {
+                        if (d.user_id && d.user_id.indexOf('-') === -1 && names.indexOf(d.user_id) === -1) {
+                            names.push(d.user_id);
+                        }
+                    });
+                    var sel = document.getElementById('existingUsers');
+                    names.forEach(function(n) {
+                        var opt = document.createElement('option');
                         opt.value = n;
                         opt.textContent = n;
                         sel.appendChild(opt);
                     });
                 }
-            } catch(e) {}
-        }
+            }).catch(function(e){});
     }
+    loadExistingUsersList();
 
-    async function loginGoogle() {
-        if (!supabase) {
-            alert("ยังไม่ได้ตั้งค่าเชื่อมต่อฐานข้อมูล Supabase");
-            return;
-        }
-        await supabase.auth.signInWithOAuth({ provider: 'google' });
-    }
-
-    function logout() {
-        try { localStorage.removeItem('localHeadacheUser'); } catch(e) {}
-        if (supabase) supabase.auth.signOut();
-        window.location.reload();
-    }
-
-    // ฟังก์ชันบันทึกข้อมูล
-    document.getElementById('recordForm').addEventListener('submit', async (e) => {
+    // บันทึกข้อมูล
+    document.getElementById('recordForm').addEventListener('submit', function(e) {
         e.preventDefault();
-        if (!supabase) {
-            alert("กรุณาใส่ Supabase URL และ Key ในโค้ดก่อนทำการบันทึก");
+        if (!window.supabaseClient) {
+            alert("กรุณาใส่ Supabase URL และ Key ให้ถูกต้องก่อนบันทึกครับ");
             return;
         }
-        const btn = document.getElementById('saveBtn');
+
+        var btn = document.getElementById('saveBtn');
         btn.disabled = true; btn.innerText = "กำลังบันทึก...";
 
-        const getChecked = (name) => Array.from(document.querySelectorAll('input[name="' + name + '"]:checked')).map(cb => cb.value);
-        const getRadio = (name) => { const el = document.querySelector('input[name="' + name + '"]:checked'); return el ? el.value : null; };
+        function getChecked(name) {
+            var arr = [];
+            document.querySelectorAll('input[name="' + name + '"]:checked').forEach(function(cb) { arr.push(cb.value); });
+            return arr;
+        }
+        function getRadio(name) {
+            var el = document.querySelector('input[name="' + name + '"]:checked');
+            return el ? el.value : null;
+        }
 
-        const payload = {
+        var payload = {
             user_id: currentUser.id,
             record_date: document.getElementById('r_date').value,
             record_time: document.getElementById('r_time').value,
@@ -441,53 +443,56 @@
             med_dose: document.getElementById('med_dose').value
         };
 
-        const { error } = await supabase.from('headache_records').insert([payload]);
-        if(error) { 
-            alert("บันทึกล้มเหลว: " + error.message); 
-        } else { 
-            alert("บันทึกข้อมูลเรียบร้อยแล้ว"); 
-            document.getElementById('recordForm').reset();
-            initFormDateTime();
-            loadHistory();
-        }
-        btn.disabled = false; btn.innerText = "บันทึกข้อมูล";
+        window.supabaseClient.from('headache_records').insert([payload])
+            .then(function(res) {
+                btn.disabled = false; btn.innerText = "บันทึกข้อมูล";
+                if (res.error) {
+                    alert("บันทึกล้มเหลว: " + res.error.message);
+                } else {
+                    alert("บันทึกข้อมูลเรียบร้อยแล้ว");
+                    document.getElementById('recordForm').reset();
+                    initFormDateTime();
+                    loadHistory();
+                }
+            });
     });
 
-    async function loadHistory() {
-        if (!supabase || !currentUser) return;
-        const { data, error } = await supabase.from('headache_records')
+    // โหลดประวัติ
+    function loadHistory() {
+        if (!window.supabaseClient || !currentUser) return;
+        window.supabaseClient.from('headache_records')
             .select('*')
             .eq('user_id', currentUser.id)
             .order('record_date', { ascending: false })
-            .order('record_time', { ascending: false });
-            
-        if(error) return;
-        recordsData = data;
-        
-        const list = document.getElementById('historyList');
-        if(!list) return;
-        if(data.length === 0) { list.innerHTML = "<p>ยังไม่มีประวัติการบันทึกของคุณ</p>"; return; }
+            .order('record_time', { ascending: false })
+            .then(function(res) {
+                var list = document.getElementById('historyList');
+                if (!list) return;
+                if (res.error) { list.innerHTML = "<p style='color:red;'>ดึงข้อมูลไม่สำเร็จ</p>"; return; }
+                if (!res.data || res.data.length === 0) { list.innerHTML = "<p>ยังไม่มีประวัติการบันทึกของคุณ</p>"; return; }
 
-        list.innerHTML = data.map((item, idx) => `
-            <div class="history-item">
-                <div class="history-info">
-                    <div class="history-date">📅 ${item.record_date} เวลา ${item.record_time.slice(0,5)} น.</div>
-                    <div style="font-size:13px; color:#666; margin-top:4px;">ระดับ: ${item.severity || '-'}</div>
-                </div>
-                <div class="history-actions">
-                    <button class="btn-view" type="button" onclick="viewDetail(${idx})">ดูรายละเอียด</button>
-                    <button class="btn-del" type="button" onclick="deleteRecord('${item.id}')">ลบ</button>
-                </div>
-            </div>
-        `).join('');
+                recordsData = res.data;
+                list.innerHTML = res.data.map(function(item, idx) {
+                    return '<div class="history-item">' +
+                        '<div class="history-info">' +
+                            '<div class="history-date">📅 ' + item.record_date + ' เวลา ' + item.record_time.slice(0,5) + ' น.</div>' +
+                            '<div style="font-size:13px; color:#666; margin-top:4px;">ระดับ: ' + (item.severity || '-') + '</div>' +
+                        '</div>' +
+                        '<div class="history-actions">' +
+                            '<button class="btn-view" type="button" onclick="viewDetail(' + idx + ')">ดูรายละเอียด</button>' +
+                            '<button class="btn-del" type="button" onclick="deleteRecord(\'' + item.id + '\')">ลบ</button>' +
+                        '</div>' +
+                    '</div>';
+                }).join('');
+            });
     }
 
     function viewDetail(idx) {
-        const item = recordsData[idx];
+        var item = recordsData[idx];
         document.getElementById('m_datetime').innerText = "บันทึกวันที่ " + item.record_date + " เวลา " + item.record_time.slice(0,5);
         
-        const b = (label, val) => '<div><strong>' + label + ':</strong> ' + (val || '-') + '</div>';
-        const a = (label, arr) => '<div><strong>' + label + ':</strong> ' + (arr && arr.length > 0 ? arr.join(', ') : '-') + '</div>';
+        function b(label, val) { return '<div><strong>' + label + ':</strong> ' + (val || '-') + '</div>'; }
+        function a(label, arr) { return '<div><strong>' + label + ':</strong> ' + (arr && arr.length > 0 ? arr.join(', ') : '-') + '</div>'; }
 
         document.getElementById('m_body').innerHTML = 
             a('อาการนำ', item.aura) +
@@ -508,102 +513,104 @@
 
     function closeModal() { document.getElementById('detailModal').classList.remove('active'); }
 
-    async function deleteRecord(id) {
+    function deleteRecord(id) {
         if(!confirm('ต้องการลบประวัตินี้ใช่หรือไม่?')) return;
-        await supabase.from('headache_records').delete().eq('id', id);
-        loadHistory();
-        if(document.getElementById('exportTab').classList.contains('active')) generateReport();
+        window.supabaseClient.from('headache_records').delete().eq('id', id)
+            .then(function() {
+                loadHistory();
+                if(document.getElementById('exportTab').classList.contains('active')) generateReport();
+            });
     }
 
     function initReportSelects() {
-        const mSel = document.getElementById('monthSelect');
-        const ySel = document.getElementById('yearSelect');
+        var mSel = document.getElementById('monthSelect');
+        var ySel = document.getElementById('yearSelect');
         if (!mSel || !ySel) return;
         
-        const thMonths = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
-        mSel.innerHTML = '<option value="all">-- ทุกเดือน --</option>' + thMonths.map((m, i) => '<option value="' + i + '">' + m + '</option>').join('');
+        var thMonths = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
+        mSel.innerHTML = '<option value="all">-- ทุกเดือน --</option>' + thMonths.map(function(m, i) { return '<option value="' + i + '">' + m + '</option>'; }).join('');
         
-        const currYear = new Date().getFullYear();
+        var currYear = new Date().getFullYear();
         ySel.innerHTML = '';
-        for(let i = currYear; i >= currYear - 5; i--) {
+        for(var i = currYear; i >= currYear - 5; i--) {
             ySel.innerHTML += '<option value="' + i + '">' + (i + 543) + '</option>';
         }
         mSel.value = new Date().getMonth();
     }
 
     function generateReport() {
-        const y = parseInt(document.getElementById('yearSelect').value);
-        const mStr = document.getElementById('monthSelect').value;
+        var y = parseInt(document.getElementById('yearSelect').value);
+        var mStr = document.getElementById('monthSelect').value;
         
-        let filteredData = recordsData.filter(r => r.record_date.startsWith(y.toString()));
+        var filteredData = recordsData.filter(function(r) { return r.record_date.indexOf(y.toString()) === 0; });
         if(mStr !== 'all') {
-            const m = parseInt(mStr) + 1;
-            const mPrefix = m < 10 ? '0'+m : String(m);
-            filteredData = filteredData.filter(r => r.record_date.split('-')[1] === mPrefix);
+            var m = parseInt(mStr) + 1;
+            var mPrefix = m < 10 ? '0'+m : String(m);
+            filteredData = filteredData.filter(function(r) { return r.record_date.split('-')[1] === mPrefix; });
         }
 
-        const daysInMonth = mStr === 'all' ? 31 : new Date(y, parseInt(mStr)+1, 0).getDate();
-        const dayLetters = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+        var daysInMonth = mStr === 'all' ? 31 : new Date(y, parseInt(mStr)+1, 0).getDate();
+        var dayLetters = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
         
-        let html = '<table id="reportTable"><thead>';
-        html += '<tr><th colspan="2" class="col-head"></th>';
-        for(let i=1; i<=daysInMonth; i++) {
-            let dayText = '';
+        var html = '<table id="reportTable"><thead><tr><th colspan="2" class="col-head"></th>';
+        for(var i=1; i<=daysInMonth; i++) {
+            var dayText = '';
             if(mStr !== 'all') {
-                const d = new Date(y, parseInt(mStr), i);
+                var d = new Date(y, parseInt(mStr), i);
                 dayText = dayLetters[d.getDay()];
             }
             html += '<th style="width:20px; font-weight:normal;">' + dayText + '</th>';
         }
-        html += '</tr>';
-
-        html += '<tr><th class="col-head" colspan="2">วันที่</th>';
-        for(let i=1; i<=daysInMonth; i++) html += '<th>' + i + '</th>';
+        html += '</tr><tr><th class="col-head" colspan="2">วันที่</th>';
+        for(var i=1; i<=daysInMonth; i++) html += '<th>' + i + '</th>';
         html += '</tr></thead><tbody>';
 
-        const rows = [
+        var rows = [
             { label: 'เวลาที่ปวดศีรษะ', sub: '', field: 'time' },
-            { label: 'อาการที่เกิดขึ้นนำมา<br>ก่อนอาการปวดศีรษะ', sub: 'เห็นแสง', check: (r) => r.aura && r.aura.includes('เห็นแสง') },
-            { label: '', sub: 'มีอาการอื่น', check: (r) => r.aura && r.aura.includes('มีอาการอื่น') },
-            { label: 'ตำแหน่งที่ปวด', sub: 'ซ้าย', check: (r) => r.location && r.location.includes('ซ้าย') },
-            { label: '', sub: 'ขวา', check: (r) => r.location && r.location.includes('ขวา') },
-            { label: '', sub: 'ทั้ง 2 ข้าง', check: (r) => r.location && r.location.includes('ทั้ง 2 ข้าง') },
-            { label: 'ลักษณะที่ปวด', sub: 'ตุบๆ', check: (r) => r.pain_character && r.pain_character.includes('ตุบๆ') },
-            { label: '', sub: 'กดบีบ', check: (r) => r.pain_character && r.pain_character.includes('กดบีบ') },
-            { label: '', sub: 'แหลมปรี๊ด', check: (r) => r.pain_character && r.pain_character.includes('แหลมปรี๊ด') },
-            { label: 'ความรุนแรง', sub: 'เล็กน้อย ถึง<br>ทำงานต่อได้', check: (r) => r.severity && r.severity.includes('เล็กน้อย') },
-            { label: '', sub: 'ปานกลาง<br>ทำงานได้ลดลง', check: (r) => r.severity && r.severity.includes('ปานกลาง') },
-            { label: '', sub: 'รุนแรง ทำงาน<br>ต่อไม่ได้', check: (r) => r.severity && r.severity.includes('รุนแรง') },
-            { label: 'อาการปวดแย่ลงเมื่อ<br>เคลื่อนไหว/ออกแรง', sub: 'แย่ลง', check: (r) => r.worsen_movement === 'แย่ลง' },
-            { label: '', sub: 'ไม่เปลี่ยนแปลง', check: (r) => r.worsen_movement === 'ไม่เปลี่ยนแปลง' },
-            { label: 'มีคลื่นไส้ร่วมด้วย<br>หรือไม่', sub: 'มี', check: (r) => r.nausea === 'มี' },
-            { label: '', sub: 'ไม่มี', check: (r) => r.nausea === 'ไม่มี' },
-            { label: 'มีตาแดง น้ำตา น้ำมูก<br>ไหลร่วมด้วย', sub: 'มี', check: (r) => r.autonomic === 'มี' },
-            { label: '', sub: 'ไม่มี', check: (r) => r.autonomic === 'ไม่มี' },
-            { label: 'อาการปวดแย่ลงเมื่อมี<br>แสงจ้าๆ', sub: 'แย่ลง', check: (r) => r.worsen_light === 'แย่ลง' },
-            { label: '', sub: 'ไม่เปลี่ยนแปลง', check: (r) => r.worsen_light === 'ไม่เปลี่ยนแปลง' },
-            { label: 'อาการปวดแย่ลงเมื่อได้<br>ยินเสียงดังๆ', sub: 'แย่ลง', check: (r) => r.worsen_noise === 'แย่ลง' },
-            { label: '', sub: 'ไม่เปลี่ยนแปลง', check: (r) => r.worsen_noise === 'ไม่เปลี่ยนแปลง' },
+            { label: 'อาการที่เกิดขึ้นนำมา<br>ก่อนอาการปวดศีรษะ', sub: 'เห็นแสง', check: function(r) { return r.aura && r.aura.indexOf('เห็นแสง') !== -1; } },
+            { label: '', sub: 'มีอาการอื่น', check: function(r) { return r.aura && r.aura.indexOf('มีอาการอื่น') !== -1; } },
+            { label: 'ตำแหน่งที่ปวด', sub: 'ซ้าย', check: function(r) { return r.location && r.location.indexOf('ซ้าย') !== -1; } },
+            { label: '', sub: 'ขวา', check: function(r) { return r.location && r.location.indexOf('ขวา') !== -1; } },
+            { label: '', sub: 'ทั้ง 2 ข้าง', check: function(r) { return r.location && r.location.indexOf('ทั้ง 2 ข้าง') !== -1; } },
+            { label: 'ลักษณะที่ปวด', sub: 'ตุบๆ', check: function(r) { return r.pain_character && r.pain_character.indexOf('ตุบๆ') !== -1; } },
+            { label: '', sub: 'กดบีบ', check: function(r) { return r.pain_character && r.pain_character.indexOf('กดบีบ') !== -1; } },
+            { label: '', sub: 'แหลมปรี๊ด', check: function(r) { return r.pain_character && r.pain_character.indexOf('แหลมปรี๊ด') !== -1; } },
+            { label: 'ความรุนแรง', sub: 'เล็กน้อย ถึง<br>ทำงานต่อได้', check: function(r) { return r.severity && r.severity.indexOf('เล็กน้อย') !== -1; } },
+            { label: '', sub: 'ปานกลาง<br>ทำงานได้ลดลง', check: function(r) { return r.severity && r.severity.indexOf('ปานกลาง') !== -1; } },
+            { label: '', sub: 'รุนแรง ทำงาน<br>ต่อไม่ได้', check: function(r) { return r.severity && r.severity.indexOf('รุนแรง') !== -1; } },
+            { label: 'อาการปวดแย่ลงเมื่อ<br>เคลื่อนไหว/ออกแรง', sub: 'แย่ลง', check: function(r) { return r.worsen_movement === 'แย่ลง'; } },
+            { label: '', sub: 'ไม่เปลี่ยนแปลง', check: function(r) { return r.worsen_movement === 'ไม่เปลี่ยนแปลง'; } },
+            { label: 'มีคลื่นไส้ร่วมด้วย<br>หรือไม่', sub: 'มี', check: function(r) { return r.nausea === 'มี'; } },
+            { label: '', sub: 'ไม่มี', check: function(r) { return r.nausea === 'ไม่มี'; } },
+            { label: 'มีตาแดง น้ำตา น้ำมูก<br>ไหลร่วมด้วย', sub: 'มี', check: function(r) { return r.autonomic === 'มี'; } },
+            { label: '', sub: 'ไม่มี', check: function(r) { return r.autonomic === 'ไม่มี'; } },
+            { label: 'อาการปวดแย่ลงเมื่อมี<br>แสงจ้าๆ', sub: 'แย่ลง', check: function(r) { return r.worsen_light === 'แย่ลง'; } },
+            { label: '', sub: 'ไม่เปลี่ยนแปลง', check: function(r) { return r.worsen_light === 'ไม่เปลี่ยนแปลง'; } },
+            { label: 'อาการปวดแย่ลงเมื่อได้<br>ยินเสียงดังๆ', sub: 'แย่ลง', check: function(r) { return r.worsen_noise === 'แย่ลง'; } },
+            { label: '', sub: 'ไม่เปลี่ยนแปลง', check: function(r) { return r.worsen_noise === 'ไม่เปลี่ยนแปลง'; } },
             { label: 'ปวดอยู่นานเท่าใด', sub: '', field: 'duration' },
             { label: 'สิ่งกระตุ้นอาการปวด', sub: 'ระบุ', field: 'triggers' },
             { label: 'ยาและขนาดที่กิน', sub: 'ชื่อยา', field: 'meds' }
         ];
 
-        rows.forEach((row, rowIndex) => {
+        rows.forEach(function(row, rowIndex) {
             html += '<tr>';
-            if (row.label !== '') html += '<td class="col-head" rowspan="' + rows.filter(r => r.label === row.label || (r.label === '' && rowIndex > 0 && rows[rowIndex-1].label !== '' && !r.field)).length + '">' + row.label + '</td>';
+            if (row.label !== '') {
+                var spanCount = rows.filter(function(r) { return r.label === row.label || (r.label === '' && rowIndex > 0 && rows[rowIndex-1].label !== '' && !r.field); }).length;
+                html += '<td class="col-head" rowspan="' + spanCount + '">' + row.label + '</td>';
+            }
             if (row.sub !== '' || row.field) html += '<td class="col-sub">' + row.sub + '</td>';
             
-            for(let i=1; i<=daysInMonth; i++) {
-                const recordsForDay = filteredData.filter(r => {
+            for(var i=1; i<=daysInMonth; i++) {
+                var recordsForDay = filteredData.filter(function(r) {
                     if (mStr === 'all') return parseInt(r.record_date.split('-')[2]) === i;
-                    const parts = r.record_date.split('-');
+                    var parts = r.record_date.split('-');
                     return parseInt(parts[2]) === i && (parseInt(parts[1]) - 1) === parseInt(mStr);
                 });
 
-                let cellContent = '';
+                var cellContent = '';
                 if(recordsForDay.length > 0) {
-                    const rec = recordsForDay[0]; 
+                    var rec = recordsForDay[0]; 
                     if(row.field === 'time') cellContent = '<div class="text-val">' + rec.record_time.slice(0,5) + '</div>';
                     else if(row.field === 'duration') cellContent = '<div class="text-val">' + (rec.duration_val ? rec.duration_val+rec.duration_unit[0] : '') + '</div>';
                     else if(row.field === 'triggers') cellContent = '<div class="text-val">' + (rec.triggers || '') + '</div>';
@@ -621,8 +628,13 @@
         document.getElementById('reportRenderArea').innerHTML = html;
     }
 
-    // เริ่มการตรวจสอบบัญชีเดิม
-    window.addEventListener('DOMContentLoaded', checkSavedUser);
+    function loginGoogle() {
+        if (!window.supabaseClient) {
+            alert("ยังไม่ได้ตั้งค่าเชื่อมต่อฐานข้อมูล Supabase");
+            return;
+        }
+        window.supabaseClient.auth.signInWithOAuth({ provider: 'google' });
+    }
     </script>
 </body>
 </html>
